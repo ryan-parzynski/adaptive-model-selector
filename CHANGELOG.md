@@ -1,0 +1,1 @@
+See §21 of HERMES-MODEL-SWITCHER.md for the version history.
