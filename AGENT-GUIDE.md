@@ -96,6 +96,7 @@ If the fixture tests fail, report the failures and stop running checks. A broken
 5. §4 (selection), §6 (escalation), §9 (invariants).
 6. §13 — the onboarding priority order. Use it to order your proposals.
 7. §30 and `docs/ledger-metrics.md` — what to record for future tuning.
+8. §31 and `docs/rule-cards/local-capacity-tiers.md` — if the box has local models: tiers, resource guards, admission.
 
 ### 3.3 Resolve the Hermes home
 
@@ -110,6 +111,7 @@ The ones that most change what applies:
 - **C1–C3:** Is there a bounded free allowance? Can it be read without spending it? Read limits live from the provider. Never from memory or from numbers in any document, including this one (invariant 42).
 - **C2:** Is a paid tier configured and allowed?
 - **C5, C5a:** Are there local models, and has their latency been measured?
+- **C5c, C5d:** Is there a capability profile for this box, and which local tiers (fast, capacity, specialized) does it have? If local models exist but no profile does, propose writing one (§31.7): measure GPU memory, RAM, and each model's actual resource use **on this box**. Never borrow another box's numbers.
 - **C6, C6a:** Is there an alert destination outside the box, and did a test message succeed recently?
 - **C8–C12:** Which switch mechanisms does this Hermes build have? Does it fall through on timeout? Can `config.yaml` be rewritten without losing comments?
 
@@ -160,6 +162,7 @@ Classify each scheduled writer by its effect on the default (§3.7): **CLOBBER**
 | Free/paid logic | Reserve (§4.13), quota-failure routing (§4.9) | Is there a reserve? Sized per session? What happens on 401, 402, 403, 429, malformed quota? |
 | Hardcoded limit numbers | Live limits (inv. 42) | Every literal limit is a gap |
 | Failover script | Fallback head rule (§6.4) | Does the fallback share the failed dependency? |
+| Local model list or tiers | Capacity tiers and admission (§31, rule card) | Is the default local model the fast tier? Is every routed model admitted? Any scripts that unload models, pull models or enable swap? |
 | Local model routing | Local-as-main (§6.3, rule card) | Is local reachable from the main path? Measured? |
 | Logs of switches | Decision ledger (§30) | What's recorded; is any conversation content in it? |
 | Alerting | "Loud" (§0.6, inv. 34) | Last *successful* delivery, not last attempt (§10.12) |
@@ -214,7 +217,7 @@ Write one Markdown file, for example `$HERMES_HOME/state/switcher-report-<date>.
 
 1. **Status** — `COMPLETE` or `INCOMPLETE` (guide §9). If INCOMPLETE, the missing-items list comes first.
 2. **Summary** — path taken (new / merge / update); spec version and commit; the three most important findings.
-3. **Box** — resolved Hermes home; Hermes build or version; provider(s); single or multiple boxes; local models yes/no.
+3. **Box** — resolved Hermes home; Hermes build or version; provider(s); single or multiple boxes; local models yes/no; if yes, the capability profile (or the gap where it should be).
 4. **Capabilities** — each questionnaire item: `present` / `absent` / `unknown`, with how you know.
 5. **Open questions for the operator** — every `unknown` and every policy question, each phrased so it can be answered in one line.
 6. **Rules** — a table: rule or invariant, applicability, check result, evidence (command and exit code, or file and line).
@@ -271,6 +274,7 @@ If the operator runs several boxes, or wants to contribute back, share a **sanit
 - Hardcode a provider's limit numbers, or trust numbers quoted in any document.
 - Delete or reorder an operator's curated list.
 - Revert a model change a human made.
+- Load, unload, download or re-quantize a local model, or touch swap, to test something on the live box (invariant 45).
 - Put conversation content or key material in a report, ledger, or log.
 - Treat a source read as proof of runtime behavior.
 - Copy an illustrative code block from the specification onto a live box. Tested checks are in `checks/`.
@@ -300,7 +304,7 @@ Every path:
 | A2 | Fixture tests run **in this run**; result recorded | `checks/tests/run.sh` exit code and summary line |
 | A3 | Hermes home resolved from the runtime | The process environment or runtime source you read it from |
 | A4 | Every capability question answered `present` / `absent` / `unknown` | Evidence per answer, or the question that resolves it |
-| A5 | Every invariant (1–44) has an applicability; every applicable one has a check result or a documented manual review with evidence | The Rules table |
+| A5 | Every invariant (1–46) has an applicability; every applicable one has a check result or a documented manual review with evidence | The Rules table |
 | A6 | Every applicable check in `checks/` run in this run | Command, exit code, timestamp |
 | A7 | Each runtime fact in guide §3.6 is source-verified, live-run-verified, or `unknown` with the command that would settle it | The Runtime facts table |
 | A8 | **Live routing unchanged by the run** | SHA-256 of `config.yaml` and of the scheduler's job listing, taken at the start and the end; they must match. (If the operator changed something meanwhile, say so; that is a foreign write, not yours.) |

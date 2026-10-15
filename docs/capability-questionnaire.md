@@ -34,6 +34,8 @@ An answer of `unknown` is legitimate. It makes the dependent rules `unknown`, an
 | C5 | Does the box have **local or self-hosted models** reachable from Hermes? | capability | Classify configured endpoints by address (private ranges, loopback, tailnet), not by name (§3.16) | Local-as-main; tail rule; inference-port access control; local inventory |
 | C5a | Has the **latency profile** of each local model been measured (time to first answer chunk, p95, by model class)? | capability | Probe history / probe-budget table | Local-as-main (whether local may serve the main session) |
 | C5b | Are any local models **hosted by another box**? | capability | Operator declaration; endpoint inspection | Cross-box dependency recording |
+| C5c | Is there a current **capability profile** for this box (GPU, memory, RAM, admitted models with measured resource use)? | capability | Read `capability_profile_file` (§31.7); see `docs/examples/capability-profile.example.yaml` | Admission (invariant 46); local tiers |
+| C5d | Which **local tiers** does the box have: fast, capacity, specialized? | capability | From the capability profile | Tier escalation and resource guards (§31) |
 
 ## Alerting
 
@@ -71,6 +73,7 @@ An answer of `unknown` is legitimate. It makes the dependent rules `unknown`, an
 | P1a | A **hold** — a pause with no expiry — is requested per override (`switcher hold`), not configured. | — | — | Same |
 | P2 | Is **local** allowed for the main session at all? | policy | `never` · `when-measured-fast-enough` | Local-as-main rule card |
 | P3 | Which **work types** are routed (text only, or also image / code / reasoning)? | policy | list | Work-type routing (§4.16) |
+| P8 | Which **capacity-tier triggers** are enabled (explicit request, deep work type, hard failure, background work)? | policy | subset of the four; default all four | §31.3 |
 
 **Note on P1.** A manual change is respected, not reverted. The selector writes nothing for the window, then logs the resume, announces it through the alert path if one is verified, and re-plans; it writes only if the current policy still picks a different model. A hold keeps the pause until `switcher resume`. (§4.14a.)
 

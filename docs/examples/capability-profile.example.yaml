@@ -1,0 +1,35 @@
+# Capability profile — EXAMPLE. Every value below is illustrative.
+# Each box measures and writes its own (§31.7). Never copy another box's profile.
+profile_version: 1
+measured_at: "2026-10-15T00:00:00Z"
+hardware:
+  gpu: "«gpu model»"
+  gpu_memory_mb: 0            # measured
+  compute_capability: "«x.y»"
+  system_ram_mb: 0            # measured
+models:
+  fast:
+    - id: "«small dense model»"
+      offload: full_gpu       # full_gpu | partial_gpu_ram | cpu_only
+      admitted_at: "2026-10-15"
+      gpu_memory_mb: 0
+      ram_mb: 0
+      first_answer_p95_s: 0.0
+      context_tokens_verified: 0
+  capacity:
+    - id: "«MoE model, large total / small active parameters»"
+      offload: partial_gpu_ram
+      admitted_at: "2026-10-15"
+      gpu_memory_mb: 0
+      ram_mb: 0
+      first_answer_p95_s: 0.0
+      context_tokens_verified: 0
+  specialized:
+    - id: "«embedding model»"
+      purpose: embeddings
+      admitted_at: "2026-10-15"
+deferred:
+  - id: "«experimental build»"
+    reason: "accelerator compatibility not verified"
+known_limitations:
+  - "«e.g. capacity model cannot load while another large model is resident»"

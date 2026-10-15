@@ -1,3 +1,13 @@
+# v3.5 — local capability tiers and resource guards
+
+Changes in this pass:
+- **§31 Local capability tiers and resource guards:** fast / capacity / specialized tiers; smallest capable model by default; explicit escalation triggers (a model's judgment of its own answer is not one); visible fallback; resource checks before a capacity-tier load; per-box capability profile
+- Invariant 45: never enable swap, unload or delete a working model, download a model, or change quantization without authorization
+- Invariant 46: a model is routed only after it is admitted on this box (loads, answers with content, resource use recorded)
+- Rule card `local-capacity-tiers.md`; questionnaire C5c, C5d, P8; ledger metrics `tier_escalation`, `local_resource_snapshot`; example capability profile; registry key `capability_profile_file`
+
+---
+
 # v3.4.2 — definition of done for agents
 
 Changes in this pass:
@@ -98,7 +108,7 @@ Changes in this pass:
 
 # Hermes Model Switcher — Operator's Guide
 
-**Version:** 3.4.2
+**Version:** 3.5
 **Last updated:** 2026-10-15
 **Purpose:** How to keep one or more Hermes boxes switching models safely, audibly, and without the failure modes this guide names.
 **Audience:** Operators of Hermes boxes. Anyone maintaining model routing on a box running the Hermes stack.
@@ -167,6 +177,7 @@ Four principles drive everything below:
 | Parameter structure | §28 |
 | Weekly review ledger | §29 |
 | Observation and decision ledgers | §30 |
+| Local capability tiers and resource guards | §31 |
 
 ---
 
@@ -1715,6 +1726,8 @@ Set by hand unless noted. Verify on both boxes. **This is the canonical invarian
 42. (R-42) **Limits are read, not remembered** — the free allowance, credit and spend limits, and their structure (counter, window type, reset instant) are read from the provider on every tick through the provider adapter. No script hardcodes a provider's limit numbers. A limit that cannot be read makes dependent checks CANNOT-OBSERVE.
 43. (R-43) **Ledgers hold no conversation content** — model ids, counts, durations, timestamps, status classes, quota values, reason codes and opaque session ids only; never prompts, responses, message text, tool arguments, file paths, URLs, or user-identifying data (§30.5). Cross-box sharing is a sanitized lessons export, never a raw ledger.
 44. (R-44) **Ledgers are descriptive before they are prescriptive** — no rule tunes itself from ledger history until that metric's sample floor is met and the operator enables tuning for that rule (§30.8).
+45. (R-45) **Local resource guards** — before loading or routing to a capacity-tier local model, the selector checks free GPU memory, free RAM, loaded models, and the context needed. Without operator authorization it never enables swap, unloads or deletes a working model, downloads a model, or changes an installed model's quantization (§31.5).
+46. (R-46) **Admission before routing** — a model enters any routing path only after it has loaded, answered with content under a class-sized probe budget, and had its resource use and latency recorded in this box's capability profile. Unverified models are deferred with a reason (§31.6).
 
 ---
 
@@ -2064,6 +2077,9 @@ The failure table is no longer duplicated here. It is the trap-door entries in *
 | Default changed by someone else | Manual-override pause; write nothing | §4.14a, invariant 41 |
 | Provider changed its limits | Read live; log the structure change | §4.9a-bis, invariant 42 |
 | Config rewrite would drop comments | Round-trip writer or sanctioned path; else do not write | §3.37, §4.14 |
+| Capacity-tier model short of memory | Smaller context, admitted smaller quantization, or fast tier; never swap or unload | §31.5, invariant 45 |
+| Capacity-tier model busy or too slow | Fall back to fast tier, visibly | §31.4 |
+| Model not yet verified on this box | Deferred; not routed | §31.6, invariant 46 |
 
 ---
 
@@ -2129,6 +2145,8 @@ Each row that records a rule's state records its **applicability** (§0.6) along
 | Local-inventory file fresh | §10.31 | yes / no / CANNOT |
 | Run ledger being written | §10.32 | yes / no / CANNOT |
 | Hot-path discipline holds | §10.33 | yes / no / CANNOT |
+| Capability profile present and current | §31.7 | yes / no / not-applicable (no local models) |
+| Routed local models all admitted | §31.6 | yes / no — list any unadmitted |
 | Fail-closed escalation exists | §4.9 | yes / no |
 | Provider-side spend cap | §4.9 | yes / no |
 | Hysteresis values in use | §4.13 | K, D, config_writes_per_hour |
@@ -2183,6 +2201,7 @@ This is a **priority order**, not a restatement of rules. Each item names the ru
 34. **Confirm the selector stands down on a manual change** and that its pause window is set. Invariant 41; §10.34.
 35. **Confirm limits are read live**, with no hardcoded provider numbers. Invariant 42; §10.35.
 36. **Start the observation and decision ledgers** before tuning anything; confirm they hold no conversation content. Invariants 43, 44; §30.
+37. **If the box has local models, write its capability profile** and admit each routed model on this box. Invariants 45, 46; §31.
 
 ---
 
@@ -2271,6 +2290,11 @@ Most of this list is generated from invariants. The rest names a failure mode no
 - Do not record conversation content in any ledger (43).
 - Do not let a rule tune itself from ledger history before its sample floor is met and tuning is enabled (44).
 - Do not sample per-session draws; the reserve needs the largest one.
+- Do not make a local model the default because it is the largest available; start on the fast tier (§31.2).
+- Do not escalate tiers on a model's judgment of its own answer (§31.3).
+- Do not enable swap, unload a working model, download a model, or change quantization without authorization (45).
+- Do not route to a model that has not been admitted on this box (46).
+- Do not apply one box's capability profile to another.
 
 ---
 
@@ -2290,6 +2314,7 @@ Most of this list is generated from invariants. The rest names a failure mode no
 - The parameter structure → §28.
 - The weekly review ledger → §29.
 - The observation and decision ledgers → §30; metric cards in `docs/ledger-metrics.md`.
+- Local capability tiers, resource guards, admission → §31.
 
 **Shell and tool pitfalls (each cost an hour in practice):**
 
@@ -2586,6 +2611,10 @@ The list below names the **patterns** the rules exist to prevent. The incident h
 | **Foreign write** | A change to the saved default that matches neither the selector's last write nor its current choice (§4.14). |
 | **Observation ledger** | Append-only raw facts: limit snapshots, request samples, per-session draws, capability changes (§30.1). |
 | **Decision ledger** | Append-only record of switches, holds, fallbacks and overrides, with reason codes and later outcome records (§30.1). |
+| **Fast tier** | Local models that fit mostly in GPU memory; the default for local work (§31.1). |
+| **Capacity tier** | Larger local models, often partly offloaded to RAM; slower; used only on an escalation trigger (§31.1, §31.3). |
+| **Admission** | Verifying on this box that a model loads, answers, and has its resource use recorded, before it is routed (§31.6). |
+| **Capability profile** | A box's record of its hardware and admitted local models (§31.7). |
 | **Reason code** | A fixed, enumerated code explaining a decision; never free text (§30.2). |
 | **Manual-override pause** | The state the selector enters after a foreign write: no writes until the window expires, an explicit resume, or — for a hold — only an explicit resume (§4.14a). |
 
@@ -2897,6 +2926,76 @@ No rule uses ledger history to change its own behavior — reserve, fallback ord
 
 ---
 
+## §31 — Local capability tiers and resource guards
+
+A box's local models are not one tier. A model that fits in GPU memory answers in seconds; a much larger one offloaded partly to system RAM can be several times slower; an experimental build may not run at all. This section decides **which local model** serves a piece of work. Whether local serves the **main session** at all is still decided by §6.3; which auxiliary chains head local is still §4.15 and §4.18.
+
+### 31.1 Tiers
+
+- **Fast / interactive** — models that fit mostly or entirely in GPU memory. The default for local work: conversation, short tool calls, routine agent steps, status checks.
+- **Capacity / deep** — larger models, often mixture-of-experts with a large total but small active parameter count, frequently split between GPU memory and system RAM. Used for long-context analysis, difficult planning, synthesis, code review, multi-step research, and background work. **Slower, and never the default merely because it is available.**
+- **Specialized / experimental** — embedding models, alternative serving runtimes, hardware-specific builds. Routed to only when explicitly configured **and** admitted (§31.6). Otherwise deferred, with the reason recorded.
+
+A box may have one tier, two, or all three. A box with little GPU memory may support only the fast tier; a box with a lot of system RAM may support a capacity tier despite a small GPU. **Tier membership is a per-box fact**, measured on that box (§31.7), never copied from another.
+
+### 31.2 Smallest capable model by default
+
+Start on the fast tier. Stay there while it completes the work.
+
+### 31.3 Escalating to the capacity tier
+
+Escalate when at least one of these holds:
+
+- the user or the task's configuration explicitly asks for the capacity tier;
+- the work type is explicitly a deep one (long-context analysis, planning, synthesis, code review, research), set by an explicit command or configuration (§4.17);
+- the fast tier **failed hard**: context overflow, an error, or a timeout under a probe budget sized for its class (§7.2);
+- the work is background or batch, and latency does not matter.
+
+Do **not** escalate for chat, short tool calls, status checks, or routine automation unless asked.
+
+**"The fast model's answer was inadequate" is not an automatic trigger.** A model judging its own output is inside its own failure domain (§5.1, §19), and heuristics about answer quality are unvalidated. Record such judgments as observations (§30); they may become a trigger only once the history shows they predict anything and the operator enables it (invariant 44).
+
+### 31.4 Falling back from the capacity tier
+
+If the capacity model is busy, short of resources, or too slow for the work, fall back to the fast tier and **say so visibly** in the session and in the decision ledger. A slow model never blocks a time-sensitive workflow when a capable faster model is available.
+
+### 31.5 Resource guards (invariant 45)
+
+Before loading or routing to a capacity-tier model, check: free GPU memory, free system RAM, which models are already loaded, the context length the work needs, whether the work is interactive or background, and whether the model is admitted on this box (§31.6).
+
+If resources are short, in order of preference: reduce the context length; use a smaller quantization **that is already installed and admitted**; use the fast tier.
+
+**Without operator authorization, never:** enable or enlarge swap; unload, stop, or delete another model that is working; download or install a model; change the quantization of an installed model. Each of these can take down work the selector cannot see, and none is reversible from inside a failed session.
+
+### 31.6 Admission before routing (invariant 46)
+
+A model enters any routing path only after it has been verified **on this box**:
+
+1. it loads;
+2. it answers with content, under a probe budget sized for its class (§7.2, Class 7);
+3. its actual resource use — GPU memory, system RAM, offload split, and time to first answer — is recorded in the capability profile.
+
+A model that has not passed all three is **deferred**, with the reason. A model whose runtime, accelerator support, or memory requirements are uncertain stays deferred.
+
+### 31.7 Capability profile
+
+Each box keeps a short profile at `{{capability_profile_file}}`:
+
+- GPU model, memory, and compute capability;
+- system RAM;
+- fast, capacity, and specialized models, each with its offload mode (full GPU, partial GPU/RAM, CPU only), its admission date, and its measured resource use and latency;
+- context sizes known to work, per model;
+- known limitations;
+- deferred models and why.
+
+The profile is written when a model is admitted and re-measured when hardware, drivers, or models change. **It never describes another box.** `doctor` reads it to answer the local-tier capability questions.
+
+### 31.8 What to record
+
+Tier escalations and fallbacks go to the decision ledger, with their trigger as a reason code. Resource snapshots taken before a capacity-tier load go to the observation ledger (§30, `docs/ledger-metrics.md`). Together they answer whether escalation helps, how often the capacity tier is resource-blocked, and whether the fast tier is quietly failing work it should not get.
+
+---
+
 ## PART II — RUNBOOK
 
 The checks are in §10. This part adds the scripts §10 references. Run each against a test config before trusting it on a live box.
@@ -3014,6 +3113,7 @@ Each decision is recorded with its reason.
 | v3.4 | v3.3.1 | Tested checks in `checks/` replace nine defective inline scripts; edge cases E4–E14; observation and decision ledgers (§30, invariants 43–44). |
 | v3.4.1 | v3.4 | `AGENT-GUIDE.md` (new / merge / update paths); `VERSION` file; adoption record; stable invariant numbers; adopter actions in the changelog. |
 | v3.4.2 | v3.4.1 | Agent guide definition of done: acceptance items, fresh-evidence verification pass, COMPLETE / INCOMPLETE, second-party verification for high-stakes changes. |
+| v3.5 | v3.4.2 | Local capability tiers and resource guards (§31); invariants 45 (resource guards) and 46 (admission before routing); per-box capability profile. |
 
 ### Record 5 — Anomalies and open items
 
@@ -3144,7 +3244,7 @@ A `doctor` command that outputs the deployment's actual config, chains, owners, 
 
 ## §21 — Document version
 
-**Version:** 3.4.2
+**Version:** 3.5
 **Last updated:** 2026-10-15
 
 **Companion artifacts:**
@@ -3230,7 +3330,7 @@ If a deployment keeps these, the rule set stays honest. If it drops them, it pro
 
 ---
 
-**End of the guide, v3.4.2.**
+**End of the guide, v3.5.**
 
 ---
 
@@ -3258,6 +3358,7 @@ paths:
   ledger_file:                 # append-only run ledger
   observation_ledger_file:     # append-only observation ledger (§30)
   decision_ledger_file:        # append-only decision ledger with outcome records (§30)
+  capability_profile_file:     # this box's hardware and admitted local models (§31.7)
 
 config_keys:
   model_default:               # e.g. "model.default"

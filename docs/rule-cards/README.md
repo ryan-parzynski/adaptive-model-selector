@@ -21,3 +21,4 @@ Cards so far:
 
 - `quota-reserve.md` — hold back part of a bounded free allowance.
 - `local-as-main.md` — when a local model may serve the main session.
+- `local-capacity-tiers.md` — which local model serves the work, resource guards, and admission.

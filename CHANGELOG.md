@@ -8,6 +8,20 @@ Version history of `HERMES-MODEL-SWITCHER.md`. The current version is in `VERSIO
 
 ---
 
+## v3.5 — 2026-10-15 — local capability tiers and resource guards
+
+- §31: local models are tiered (fast / capacity / specialized). Start on the fast tier; escalate only on an explicit request, an explicitly deep work type, a hard failure of the fast tier, or background work. A model's judgment of its own answer is recorded, not acted on.
+- Invariant 45 (resource guards): check GPU memory, RAM, loaded models and context before a capacity-tier load; never enable swap, unload or delete a working model, download a model, or change quantization without authorization.
+- Invariant 46 (admission): a model is routed only after it loads, answers with content, and has its resource use recorded in this box's capability profile.
+- New: rule card `local-capacity-tiers.md`, `docs/examples/capability-profile.example.yaml`, questionnaire C5c/C5d/P8, ledger metrics `tier_escalation` and `local_resource_snapshot`, registry key `capability_profile_file`.
+
+**Adopters: action required**
+- Boxes **with local models:** write the capability profile (§31.7), measured on the box. Admit every local model currently in a routing path (§31.6); defer any that fail, with the reason.
+- Confirm the default for local work is a fast-tier model, not the largest one.
+- Search the selector and scripts for commands that enable swap, unload, pull, delete or re-quantize models outside an operator-invoked path (invariant 45).
+- Set policy P8 (which capacity-tier triggers are enabled).
+- Boxes **without local models:** invariants 45 and 46 are not applicable. No action.
+
 ## v3.4.2 — 2026-10-15 — definition of done for agents
 
 - `AGENT-GUIDE.md` §9: every run ends COMPLETE or INCOMPLETE, decided by a final verification pass that re-checks each acceptance item from current state, never from earlier notes. Missing items are listed with the exact command that would obtain them.

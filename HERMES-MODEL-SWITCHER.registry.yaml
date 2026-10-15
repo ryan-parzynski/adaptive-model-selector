@@ -17,6 +17,7 @@ paths:
   ledger_file:                 # append-only run ledger
   observation_ledger_file:     # append-only observation ledger (§30)
   decision_ledger_file:        # append-only decision ledger with outcome records (§30)
+  capability_profile_file:     # this box's hardware and admitted local models (§31.7)
 
 config_keys:
   model_default:               # e.g. "model.default"

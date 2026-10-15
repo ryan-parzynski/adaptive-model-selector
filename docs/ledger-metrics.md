@@ -138,6 +138,32 @@ Retention for every raw record is `ledger_raw_retention_days` (default 90); roll
 | Review question | Are sessions with two or more signals actually worse off than sessions without? |
 | Prune if | the operator disables struggle detection |
 
+### tier_escalation
+
+| | |
+|---|---|
+| Purpose | Learn whether escalating to the capacity tier helps |
+| Ledger | decision |
+| Collected | on every escalation to, or fallback from, the capacity tier |
+| Unit | trigger reason code (`explicit_request`, `deep_work_type`, `fast_tier_hard_failure`, `background`, `resource_blocked`, `too_slow`), from model, to model, outcome link |
+| Sampling | every event |
+| Informs | `local-capacity-tiers` (§31.3, §31.4) |
+| Review question | Do escalations finish work the fast tier could not? How often is the capacity tier blocked by resources? |
+| Prune if | the box has a single local tier |
+
+### local_resource_snapshot
+
+| | |
+|---|---|
+| Purpose | See how close the box runs to its memory limits |
+| Ledger | observation |
+| Collected | just before each capacity-tier load, and at admission |
+| Unit | free GPU memory, free RAM (MB), loaded models, requested context |
+| Sampling | every capacity-tier load |
+| Informs | resource guards (§31.5, invariant 45); the capability profile |
+| Review question | How often was a load refused or downgraded for lack of memory, and which model was resident at the time? |
+| Prune if | no capacity tier |
+
 ### capability_change
 
 | | |
