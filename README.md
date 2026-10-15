@@ -61,7 +61,7 @@ A `checks/` directory of tested scripts is planned; it does not exist yet.
 
 ## Status
 
-- **Version:** 3.3
+- **Version:** 3.3.1
 - **Verified:** source-verified against the running stack. The checks embedded
   in §10 are **illustrative, not tested scripts**; several have known defects.
   Do not copy them onto a live box. Tested checks will ship as files.

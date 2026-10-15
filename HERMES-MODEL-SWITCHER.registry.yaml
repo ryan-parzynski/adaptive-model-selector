@@ -93,6 +93,8 @@ numbers:
     description: "minimum uptime before a newly admitted peer serves batch work"
 
 lists:
+  router_exclusion_patterns:
+    description: "id patterns for routers and guardrail models excluded from interactive ladders (§4.4a)"
   selector_tools:
     description: "every shelled-out tool the selector needs"
   aux_chains_blocking:
@@ -107,10 +109,10 @@ lists:
 placeholders:
   box:                         "the deployment identifier"
   peer:                        "the other deployment in a pair"
-  tailnet-ip:                  "the tailnet address of a card or box"
-  card-1:                      "first local inference host (role order)"
-  card-2:                      "second local inference host (role order)"
-  card-3:                      "third local inference host (role order)"
+  tailnet_ip:                  "the tailnet address of a card or box"
+  card_1:                      "first local inference host (role order)"
+  card_2:                      "second local inference host (role order)"
+  card_3:                      "third local inference host (role order)"
   model_id:                    "a model id from the deployment's catalog"
   image_model_id:              "an image-capable model id from the catalog"
   provider:                    "a provider name from the deployment's config"

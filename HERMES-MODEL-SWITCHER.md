@@ -1,3 +1,16 @@
+# v3.3.1 — cleanup pass from 3.3
+
+Changes in this pass:
+- Cross-references corrected: glossary "Rule tier" → §27.4, "Import-boundary lint" → §27.3, §27.2 → §27.6, Record 3 #2 → new §16 Q49, Record 5 alert-path design → Record 3 #10 / R.7
+- §26.10 renumbered §26.9 (there was no §26.9); all references updated
+- Placeholders `tailnet-ip`, `card-1..3` renamed to underscores, as the v3.2b notes claimed had been done
+- Router and guardrail exclusion (§4.4a) and "zero-price is free only for its work type" (§4.6) added to §4; previously only in §14 and Record 3
+- Embedded registry declared a copy; the `.yaml` file is canonical
+- Record 4 brought up to date (v3.2b–v3.3.1); `CHANGELOG.md` now holds the version history
+- Correction to the v3.2b notes below: they mention "Record 7 A5/A7/A9"; those ids never existed in this document. Record 7's three blocked items are unnumbered.
+
+---
+
 # v3.3 — rule pass from 3.2c
 
 Changes in this pass:
@@ -54,7 +67,7 @@ Changes in this pass:
 
 # Hermes Model Switcher — Operator's Guide
 
-**Version:** 3.3
+**Version:** 3.3.1
 **Last updated:** 2026-10-15
 **Purpose:** How to keep one or more Hermes boxes switching models safely, audibly, and without the failure modes this guide names.
 **Audience:** Operators of Hermes boxes. Anyone maintaining model routing on a box running the Hermes stack.
@@ -363,7 +376,7 @@ Restart semantics vary. **Verify the supervisor before assuming a restart comman
     «other logs»              # e.g., verify-*.log, failover.log
   scripts/                    # selector and helper scripts
   profiles/                   # per-profile dirs; absence can cause phantom assignees
-  state/                      # mode 700; heartbeat and ledger files
+  state/                      # {{state_dir}}; mode 700; heartbeat and ledger files
 ```
 
 **A box may mount `{{hermes_home}}` under more than one path.** Verify by reading `{{hermes_home}}` from the runtime environment, not from the shell's `$HOME`. A harness that resolves the shell's `$HOME` may read a directory with no config.
@@ -844,7 +857,7 @@ Rotate the password if there is evidence of exposure or compromise. Otherwise, n
 - Turn authentication on for web UIs; turn signup off.
 - For an inference server with no built-in authentication, the ACL is its only boundary; record that as a deliberate choice, or put a token-requiring reverse proxy in front.
 
-**Check:** connect from a tailnet device that isn't allowed and expect a refusal. If no such test device exists, the result is CANNOT-OBSERVE, not PASS. See §26.10 for the local-tier security rule.
+**Check:** connect from a tailnet device that isn't allowed and expect a refusal. If no such test device exists, the result is CANNOT-OBSERVE, not PASS. See §26.9 for the local-tier security rule.
 
 ### 3.35 Scoped-override guards
 
@@ -943,6 +956,12 @@ Do **not** filter on a different modality field, on the model's name, or on the 
 
 **Non-text work types** (§4.16) loosen this filter to include the relevant modality. The default remains text-only.
 
+### 4.4a Router and guardrail exclusion
+
+Some catalog entries are not models in the ladder's sense. A **router** (an id that itself picks a model, such as an `auto`, `router`, or `fusion` entry) hides which model actually served a turn and makes cost and health unobservable. A **guardrail** or content-safety model can pass every filter and win a ladder while being useless for chat — one observed catalog did exactly this (§3.36).
+
+**Rule:** exclude routers and guardrail models from the interactive ladders before ranking. The patterns are per-box (`{{router_exclusion_patterns}}`), because naming differs by provider; log every excluded id with the pattern that excluded it, so a wrong pattern is visible rather than silently shrinking the ladder.
+
 ### 4.5 Suffix filter
 
 Model ids carry meaningful suffixes:
@@ -964,6 +983,8 @@ Free means "priced 0/0 in the live catalog." Suffix is one signal; live membersh
 - When in doubt, prefer live membership. **Price-based detection is the safer union** — it catches suffix-less free ids and does not depend on a naming convention.
 
 **Trap:** some free ids have no `:free` suffix. A suffix-only check either skips them or routes them as paid, thrashing the free tier. See §3.31.
+
+**A zero-price model is free only for the work type it serves.** A 0/0 image or audio model is not a candidate for the free *text* ladder; the output-modality filter (§4.4) runs before free-set membership, not after. Free means "priced 0/0 for every price field" — prompt, completion, per-request, and any other the catalog lists — not only the two headline fields.
 
 ### 4.7 Pricing
 
@@ -1206,7 +1227,7 @@ Not all auxiliary work is equally harmless if it fails.
 - Primary: a local provider (the intended use of local hardware), or an API provider if no local is available.
 - Failure logged; main session unaffected.
 
-Subagents are not automatically non-blocking. Classify by whether the main turn waits on them.
+Subagents are not automatically non-blocking. Classify by whether the main turn waits on them. Record the classification in the registry lists `{{aux_chains_blocking}}`, `{{aux_chains_non_blocking}}`, and `{{aux_chains_unknown}}`.
 
 **Unknown blocking status → API head.** A chain whose blocking status cannot be determined from source or from a live trace heads at an API entry. The reason is asymmetric risk: an unknown blocking chain headed local delays a user turn; an unknown non-blocking chain headed API costs a paid tick on work that could have been free. The second error is bounded, logged, and recoverable next tick. The first is not.
 
@@ -1435,7 +1456,7 @@ A chain entry on this box may be hosted on another box — a local model served 
 
 **Rules:**
 
-- **Record the dependency.** The consuming box's state file lists the entry and its host. The host box's state file lists the consuming box. A change on the host (card maintenance, model swaps, VRAM use) shows the consumer is affected.
+- **Record the dependency.** The consuming box's state file lists the entry and its host, and the registry list `{{cross_box_dependencies}}` names it. The host box's state file lists the consuming box. A change on the host (card maintenance, model swaps, VRAM use) shows the consumer is affected.
 - **Probe from the consumer.** A local entry hosted on another box is never assumed healthy because the host's own checks pass. The consuming box probes it.
 - **Provide a fallback not hosted on the same box.** If the peer is down, the consumer needs an independent route. The fallback for a peer-hosted local entry is not another entry on the same peer.
 - **Report the independence.** In the θ/independence check (§4.18 and §6.3a), a peer-hosted local entry is independent of the box's own provider but **not** independent of the peer. A failure that takes the peer offline takes the entry with it.
@@ -1871,7 +1892,7 @@ Set by hand unless noted. Verify on both boxes. **This is the canonical invarian
 37. (R-37) **Hysteresis** — return to free requires `{{free_return_K}}` healthy reads over `{{free_return_D}}` minutes. Every state has a minimum stay. Config writes are capped at `{{config_writes_per_hour}}` per rolling hour; hitting the cap pins the safe tier and alerts (§4.13). This is the same mechanism as §7.5's cooldown and rate-limit entries; configure them once.
 38. (R-38) **Cross-box dependency** — a chain entry hosted on another box is recorded, probed from the consumer, backed by an independent fallback, and listed on both boxes' state records (§6.4a). A peer-hosted local entry is not an independent API route for §4.9.
 39. (R-39) **Owner field is populated** — every artifact that has a single-writer rule has a named owner. **The artifacts with a single-writer rule are:** `{{model_default}}` (invariant 21), the local-inventory state file (§26.1), the alert-heartbeat file (§29.1), the run ledger (§29.1), the decision record (per deployment §12), the write lock (§4.14), and the config-write path (§4.14). Each names its owner. (The empty-owner rule lives in invariant 21; it is not restated here.)
-40. (R-40) **Local inference ports have explicit access control (§26.10)** — ports bind to loopback or the tailnet interface only, have a tailnet ACL allowing only named devices, and require authentication on web UIs. A check that cannot observe the refusal reports CANNOT-OBSERVE.
+40. (R-40) **Local inference ports have explicit access control (§26.9)** — ports bind to loopback or the tailnet interface only, have a tailnet ACL allowing only named devices, and require authentication on web UIs. A check that cannot observe the refusal reports CANNOT-OBSERVE.
 41. (R-41) **Foreign writes pause the selector** — if the saved default differs from both the selector's last write and its current choice, another writer changed it. The selector enters the manual-override pause (§4.14a), writes nothing, and never reverts the change. The pause ends after `{{manual_override_hours}}` hours (default 4), immediately on an explicit resume, or — when the operator asked for a hold — only on an explicit resume.
 42. (R-42) **Limits are read, not remembered** — the free allowance, credit and spend limits, and their structure (counter, window type, reset instant) are read from the provider on every tick through the provider adapter. No script hardcodes a provider's limit numbers. A limit that cannot be read makes dependent checks CANNOT-OBSERVE.
 
@@ -2231,7 +2252,7 @@ Report each case PASS / FAIL / CANNOT-OBSERVE.
 
 ### 10.30 Confirm the local inference ports have access control
 
-See §3.34 and §26.10. Test:
+See §3.34 and §26.9. Test:
 
 - Bind: the inference port is not listening on all interfaces.
 - Reachability: a connection from a tailnet device that is not allowed is refused.
@@ -2289,7 +2310,7 @@ The failure table is no longer duplicated here. It is the trap-door entries in *
 | Local head on a blocking chain | Move head to API | §4.15, invariant 3 |
 | Config write with no material change | Skip the write | §4.14, invariant 18 |
 | Write without a lock | Lock file + atomic pair | §4.14, invariant 13 |
-| Inference port open to the tailnet | Add ACL, bind loopback/tailnet only | §3.34, §26.10 |
+| Inference port open to the tailnet | Add ACL, bind loopback/tailnet only | §3.34, §26.9 |
 | Empty alert channel and no provider-side cap | State unprotected in §12 | §4.9, invariant 36 |
 | Hot-path I/O creep | Run the blocked-network test and the lint | §27.3, §27.7 |
 | Rule's capability absent | Report not-applicable; do not run the check | §0.6, invariant 33 |
@@ -2405,7 +2426,7 @@ This is a **priority order**, not a restatement of rules. Each item names the ru
 22. **Confirm the quota-read failure path routes by failure class.** Auth and provider-unreachable do not switch; quota-unreadable and free-model-only faults fail closed to paid. Log the class. Invariant 30; §4.9.
 23. **Confirm no secret appears on a command line.** Run the static scan in §10.27. Invariant 31.
 24. **Confirm the runtime falls through on timeout**, or apply the conservative default for any chain with non-zero θ. §10.28; §4.18.
-25. **Confirm the local inference ports have explicit access control.** The tailnet is not a trust boundary. §3.34; §10.30; §26.10.
+25. **Confirm the local inference ports have explicit access control.** The tailnet is not a trust boundary. §3.34; §10.30; §26.9.
 26. **Record cross-box dependencies** in both boxes' state records. §6.4a; invariant 38.
 27. **Confirm the fail-closed escalation and spend guard exist**, or state their absence in the deployment's §12 record. Invariant 36; §4.9.
 28. **Confirm the signal-scope rule is implemented**, or the struggle score is advisory only. Invariant 35; §5.8.
@@ -2593,7 +2614,7 @@ Fill in per deployment. Each is a fact or a choice a deployment must supply.
 **Local tier**
 
 33. Does this box have a local tier? If so, is it host-local or peer-hosted? (§6.4a.)
-34. Do the local inference ports bind to loopback or the tailnet interface only? Is there an ACL? Is auth on for web UIs? (§3.34, §26.10.)
+34. Do the local inference ports bind to loopback or the tailnet interface only? Is there an ACL? Is auth on for web UIs? (§3.34, §26.9.)
 35. Which chain entries on this box are hosted on another box? (§6.4a.)
 36. Does the local-inventory state file exist, and is it fresh? (§26, §10.31.)
 
@@ -2614,6 +2635,7 @@ Fill in per deployment. Each is a fact or a choice a deployment must supply.
 46. What are the alert and ledger staleness multipliers? (§29.5.)
 47. How long should a manual override pause the selector — the default 4 hours, or another value in the 4–6 hour range? (§4.14a.)
 48. Which limits does the provider expose, and what is their structure — counter, window type, reset source, scope? (§4.9a-bis.)
+49. What does the runtime's `config set` write, and does it write in place or atomically? (§4.14; Record 3 #2.)
 
 **Checking these answers.** Each question maps to a §10 check or a §12 record row. A question with no answer after a §10 run is a CANNOT-OBSERVE for that row — not an omission.
 
@@ -2807,8 +2829,8 @@ The list below names the **patterns** the rules exist to prevent. The incident h
 | **Allowlist** | The operator-owned list of card node ids the reconciler is permitted to probe (§26.7). |
 | **Hot-path discipline** | The invariant that the prompt path performs no I/O, no network calls, no config parsing, and no rule evaluation (§27). |
 | **Blocked-network test** | A test that runs the prompt path with network, tailnet, probe, and file-write modules disabled (§27.3). |
-| **Import-boundary lint** | A build-time check that fails if a hot-path module imports a probe, discovery, budget-writer, or alert module (§27.4). |
-| **Rule tier** | One of Cheap / Medium / Expensive, classifying when a rule may consult (§28.3). |
+| **Import-boundary lint** | A build-time check that fails if a hot-path module imports a probe, discovery, budget-writer, or alert module (§27.3). |
+| **Rule tier** | One of Cheap / Medium / Expensive, classifying when a rule may consult (§27.4). |
 | **Run ledger** | An append-only JSONL file with one record per selector run, for the weekly review (§29). |
 | **Heartbeat** | The current-state file, overwritten each run (`alerts.json`) (§29.1). |
 | **Foreign write** | A change to the saved default that matches neither the selector's last write nor its current choice (§4.14). |
@@ -2863,7 +2885,7 @@ The local cards are on a tailnet. Peers come and go, names change (a card rename
 
 ### 26.2 Card identity
 
-Stable node id (the tailnet's node id, if the installed version exposes it) is the identity key. Survives reboot, rename, DHCP change. Hostname and IP are observed attributes only, never keys. The role label (`{{card-1}}`, `{{card-2}}`, `{{card-3}}`) is the only local name in `{{config_path}}`.
+Stable node id (the tailnet's node id, if the installed version exposes it) is the identity key. Survives reboot, rename, DHCP change. Hostname and IP are observed attributes only, never keys. The role label (`{{card_1}}`, `{{card_2}}`, `{{card_3}}`) is the only local name in `{{config_path}}`.
 
 **Fact to confirm:** does the installed tailnet client expose a stable node id? If not, the allowlist becomes role → observed-attributes-with-history and the operator's edit is on any change, not just hardware swap.
 
@@ -2900,7 +2922,7 @@ Resolve against a hand-maintained allowlist of stable node ids. Auto-discovery r
 
 The allowlist is itself a hand-maintained map. A replaced card gets a new node id, so the operator must edit config on every hardware swap. **The design removes the reboot-and-rename edits; it does not remove the hardware-swap edit.** Runbook step: *when you replace a card, update the allowlist with the new node id.*
 
-### 26.10 Inference-port access control
+### 26.9 Inference-port access control
 
 **Local inference ports bind to loopback or the tailnet interface only, have a tailnet ACL allowing only named devices, and require authentication on web UIs; a check that cannot observe the refusal reports CANNOT-OBSERVE.**
 
@@ -2925,7 +2947,7 @@ The rule that keeps the design from bloating as rules are added.
 
 ### 27.2 Scope
 
-**This rule applies to box-owned code.** The prompt path in the runtime itself is not box-owned; the box cannot edit it. For the runtime, the hot-path invariant becomes a black-box test and a re-check on upgrade (§27.5).
+**This rule applies to box-owned code.** The prompt path in the runtime itself is not box-owned; the box cannot edit it. For the runtime, the hot-path invariant becomes a black-box test and a re-check on upgrade (§27.6).
 
 ### 27.3 Enforcement, for box-owned code
 
@@ -3151,7 +3173,7 @@ The rule set in Part I was reached by two independently-built switchers. The rul
 Each decision is recorded with its reason.
 
 1. **Write ordering.** Sequential writes in either order are the defect. The rule is the atomic pair: stage both keys, rename once under a lock. Where the writer cannot do an atomic replace, the limitation is stated, not assumed away.
-2. **`config set` semantics.** `config set`'s write behavior is unverified; see §16 Q40. §4.14 says the CLI writes in place.
+2. **`config set` semantics.** `config set`'s write behavior is unverified; see §16 Q49. §4.14 says the CLI writes in place.
 3. **Reserve unit.** Session, not turn. Sized above the p95 single-session draw, with a sample floor of 59 before the p95 is trusted.
 4. **Free detection.** Price and live membership (the union). Suffix-only detection misses suffix-less free ids.
 5. **Probe timeout.** Per-model class. A fixed timeout is the defect Class 7 names.
@@ -3179,6 +3201,10 @@ Each decision is recorded with its reason.
 | v3.1 | v3.0 | Applied the v3.0 review's 17-item defect list: probe-budget fix, atomic pair, secrets off argv, drift-check fix, timeout check, reserve unit and sample floor, quota-read policy, document cleanups. |
 | v3.2 | v3.1 | Applied the v3.1 review's defects, the portability stress test, the publication-readiness list, the parameter structure, the hot-path discipline, the dynamic local inventory, the reconciliation fixes. Sanitized for publication. Introduced a local-escalation contradiction and cited sections (§26–§29) that were not written. |
 | v3.2a | v3.2 | Fixed the local-escalation contradiction (escalate to an independent API route, not local); wrote §26–§29; restored the scoping of the hot-path rule and the reachability qualifier of the signal-scope rule; named the authoritative file and hash in the header; restored the box findings, blocked items, and chain disputes to the record; corrected the sample floor to 59; named the owner for every artifact with a single-writer rule; deduplicated the hysteresis rule; converted every §10 check to the three-result convention. |
+| v3.2b | v3.2a | Patch pass: completed §6.5; removed production markers; replaced the inline hash with an integrity sidecar; added §26.10 (now §26.9) and invariant 40; unified tier terminology; registry cleanups. |
+| v3.2c | v3.2b | Housekeeping: LF line endings and `.gitattributes`; embedded scripts marked illustrative; private record filename removed; whole-repository GPL-3.0 stated. |
+| v3.3 | v3.2c | Rule pass: two-axis reporting (applicability vs. check result); fallback heads that do not share the failed dependency; time-boxed manual-override pause (invariant 41); limits read live (invariant 42); credit/spend-limit failure classes; round-trip-safe config writes; local-as-main as a measured conditional exception; sample-floor, per-session, heartbeat, struggle-scope, hysteresis and inequality corrections. |
+| v3.3.1 | v3.3 | Cleanup: cross-references corrected; §26.10 renumbered §26.9; placeholders use underscores; router/guardrail exclusion and zero-price-by-work-type moved into §4; registry file declared canonical; this table brought up to date. |
 
 ### Record 5 — Anomalies and open items
 
@@ -3191,7 +3217,7 @@ Anomalies observed but whose cause was not determined, recorded so a future read
 
 - The TUI round-trip for scoped `/model` — a human types `/model «id» --session` in a live window and confirms the status bar changes while the config does not. Source-verified; not live-run-verified.
 - The runtime's fall-through-on-timeout behavior — source-verified on the reference box; confirm on each deployment (§10.28).
-- The alert path — deferred. The design is in §29; the implementation is per-deployment.
+- The alert path — deferred. The design is in Record 3 #10 and R.7 (heartbeat shape in §29); the implementation is per-deployment.
 - The per-chain θ — measured as an overlap bound where the box can; otherwise the conservative default applies (§4.18).
 - The `temp-override.json` question — verify on each deployment (§16 question 25).
 
@@ -3309,7 +3335,7 @@ A `doctor` command that outputs the deployment's actual config, chains, owners, 
 
 ## §21 — Document version
 
-**Version:** 3.3
+**Version:** 3.3.1
 **Last updated:** 2026-10-15
 
 **Companion artifacts:**
@@ -3395,13 +3421,13 @@ If a deployment keeps these, the rule set stays honest. If it drops them, it pro
 
 ---
 
-**End of the guide, v3.3.**
+**End of the guide, v3.3.1.**
 
 ---
 
 ## Registry — `HERMES-MODEL-SWITCHER.registry.yaml`
 
-Every `{{...}}` in the guide resolves here. Each entry names its purpose and, where it is an operator choice, states the question the operator answers. Fill before deployment.
+Every `{{...}}` in the guide resolves here. Each entry names its purpose and, where it is an operator choice, states the question the operator answers. Fill before deployment. **This block is a copy of `HERMES-MODEL-SWITCHER.registry.yaml`; the file is canonical.** When they differ, the file wins.
 
 ```yaml
 # Hermes Model Switcher registry.
@@ -3499,6 +3525,8 @@ numbers:
     description: "minimum uptime before a newly admitted peer serves batch work"
 
 lists:
+  router_exclusion_patterns:
+    description: "id patterns for routers and guardrail models excluded from interactive ladders (§4.4a)"
   selector_tools:
     description: "every shelled-out tool the selector needs"
   aux_chains_blocking:
@@ -3513,10 +3541,10 @@ lists:
 placeholders:
   box:                         "the deployment identifier"
   peer:                        "the other deployment in a pair"
-  tailnet-ip:                  "the tailnet address of a card or box"
-  card-1:                      "first local inference host (role order)"
-  card-2:                      "second local inference host (role order)"
-  card-3:                      "third local inference host (role order)"
+  tailnet_ip:                  "the tailnet address of a card or box"
+  card_1:                      "first local inference host (role order)"
+  card_2:                      "second local inference host (role order)"
+  card_3:                      "third local inference host (role order)"
   model_id:                    "a model id from the deployment's catalog"
   image_model_id:              "an image-capable model id from the catalog"
   provider:                    "a provider name from the deployment's config"
