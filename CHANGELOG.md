@@ -8,6 +8,18 @@ Version history of `HERMES-MODEL-SWITCHER.md`. The current version is in `VERSIO
 
 ---
 
+## v3.4.2 — 2026-10-15 — definition of done for agents
+
+- `AGENT-GUIDE.md` §9: every run ends COMPLETE or INCOMPLETE, decided by a final verification pass that re-checks each acceptance item from current state, never from earlier notes. Missing items are listed with the exact command that would obtain them.
+- A failing rule on the box is a finding; an unverified rule makes the run incomplete.
+- High-stakes changes (ownership transfer, enabling or disabling a writer or job, fallback-list changes, self-tuning) require verification by the operator or a separate agent.
+- The guide checks that a run left live routing unchanged (config and job-listing hashes, start vs end), and that the report contains no key material.
+
+**Adopters: action required**
+- Reports written under v3.4.1 or earlier have no Status or Verification log. On your next run, produce a full report under guide §9 rather than updating the old one.
+- Add `second_party_verified` to `state/switcher-adoption.yaml`. For any high-stakes change already applied, record who verified it, or verify it now.
+- No rule changes.
+
 ## v3.4.1 — 2026-10-15 — agent guide and update path
 
 - `AGENT-GUIDE.md`: one guide for a Hermes agent adopting the specification on a new box, merging it with an existing switching setup, or updating from an earlier version. Includes a paste-in prompt and a report format.

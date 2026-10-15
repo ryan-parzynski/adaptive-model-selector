@@ -1,3 +1,13 @@
+# v3.4.2 — definition of done for agents
+
+Changes in this pass:
+- `AGENT-GUIDE.md` §9: acceptance items per path, a final verification pass from fresh evidence, item states (VERIFIED / FAILED / SKIPPED / MISSING), COMPLETE vs INCOMPLETE with the exact command for each missing item, and second-party verification for high-stakes changes
+- Run completeness is kept separate from box health: a failing rule is a finding, an unverified rule makes the run incomplete
+- Report format gains a Status section first and a Verification log last; adoption record gains `second_party_verified`
+- Corrected a reference in the report format (runtime facts are guide §3.6, not spec §3.6)
+
+---
+
 # v3.4.1 — agent guide and update path
 
 Changes in this pass:
@@ -88,7 +98,7 @@ Changes in this pass:
 
 # Hermes Model Switcher — Operator's Guide
 
-**Version:** 3.4.1
+**Version:** 3.4.2
 **Last updated:** 2026-10-15
 **Purpose:** How to keep one or more Hermes boxes switching models safely, audibly, and without the failure modes this guide names.
 **Audience:** Operators of Hermes boxes. Anyone maintaining model routing on a box running the Hermes stack.
@@ -3003,6 +3013,7 @@ Each decision is recorded with its reason.
 | v3.3.1 | v3.3 | Cleanup: cross-references corrected; §26.10 renumbered §26.9; placeholders use underscores; router/guardrail exclusion and zero-price-by-work-type moved into §4; registry file declared canonical; this table brought up to date. |
 | v3.4 | v3.3.1 | Tested checks in `checks/` replace nine defective inline scripts; edge cases E4–E14; observation and decision ledgers (§30, invariants 43–44). |
 | v3.4.1 | v3.4 | `AGENT-GUIDE.md` (new / merge / update paths); `VERSION` file; adoption record; stable invariant numbers; adopter actions in the changelog. |
+| v3.4.2 | v3.4.1 | Agent guide definition of done: acceptance items, fresh-evidence verification pass, COMPLETE / INCOMPLETE, second-party verification for high-stakes changes. |
 
 ### Record 5 — Anomalies and open items
 
@@ -3133,7 +3144,7 @@ A `doctor` command that outputs the deployment's actual config, chains, owners, 
 
 ## §21 — Document version
 
-**Version:** 3.4.1
+**Version:** 3.4.2
 **Last updated:** 2026-10-15
 
 **Companion artifacts:**
@@ -3219,7 +3230,7 @@ If a deployment keeps these, the rule set stays honest. If it drops them, it pro
 
 ---
 
-**End of the guide, v3.4.1.**
+**End of the guide, v3.4.2.**
 
 ---
 

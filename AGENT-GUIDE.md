@@ -16,7 +16,7 @@ Everything else in this repository is reference material. This guide tells you w
 
 An operator can give this to a Hermes agent as-is:
 
-> You are helping me adopt the Hermes Model Switcher specification on this box. Clone or update `https://github.com/ryan-parzynski/adaptive-model-selector` and follow `AGENT-GUIDE.md`. Work out which path applies — new, merging an existing setup, or updating from an earlier version of this spec — and follow it. **Do not change model routing on this box:** no edits to `config.yaml`, no `/model --global`, no enabling or disabling scheduled jobs. Discover, check and report; propose changes for me to approve. Report in the format the guide specifies.
+> You are helping me adopt the Hermes Model Switcher specification on this box. Clone or update `https://github.com/ryan-parzynski/adaptive-model-selector` and follow `AGENT-GUIDE.md`. Work out which path applies — new, merging an existing setup, or updating from an earlier version of this spec — and follow it. **Do not change model routing on this box:** no edits to `config.yaml`, no `/model --global`, no enabling or disabling scheduled jobs. Discover, check and report; propose changes for me to approve. Report in the format the guide specifies, and finish only by its Definition of done (guide §9): end with COMPLETE or INCOMPLETE, verified from fresh evidence.
 
 ---
 
@@ -212,17 +212,19 @@ Add to the report (guide §6) an **update summary**: from-version, to-version, e
 
 Write one Markdown file, for example `$HERMES_HOME/state/switcher-report-<date>.md`, with these sections:
 
-1. **Summary** — path taken (new / merge / update); spec version and commit; the three most important findings.
-2. **Box** — resolved Hermes home; Hermes build or version; provider(s); single or multiple boxes; local models yes/no.
-3. **Capabilities** — each questionnaire item: `present` / `absent` / `unknown`, with how you know.
-4. **Open questions for the operator** — every `unknown` and every policy question, each phrased so it can be answered in one line.
-5. **Rules** — a table: rule or invariant, applicability, check result, evidence (command and exit code, or file and line).
-6. **Runtime facts** — each fact from §3.6, with source-verified or live-run-verified.
-7. **Inventory** (merge path) — every writer, its classification, and whether it ran successfully last time.
-8. **Gaps and conflicts** — each labelled OBSERVED / HYPOTHESIS / BLOCKED.
-9. **Proposals** — ordered by §13; each with the rule it satisfies, risk, rollback, and whether it needs an operator decision.
-10. **Migration plan** (merge path) or **Update summary** (update path).
-11. **Limits of this report** — what you could not observe and why.
+1. **Status** — `COMPLETE` or `INCOMPLETE` (guide §9). If INCOMPLETE, the missing-items list comes first.
+2. **Summary** — path taken (new / merge / update); spec version and commit; the three most important findings.
+3. **Box** — resolved Hermes home; Hermes build or version; provider(s); single or multiple boxes; local models yes/no.
+4. **Capabilities** — each questionnaire item: `present` / `absent` / `unknown`, with how you know.
+5. **Open questions for the operator** — every `unknown` and every policy question, each phrased so it can be answered in one line.
+6. **Rules** — a table: rule or invariant, applicability, check result, evidence (command and exit code, or file and line).
+7. **Runtime facts** — each fact from guide §3.6, with source-verified or live-run-verified.
+8. **Inventory** (merge path) — every writer, its classification, and whether it ran successfully last time.
+9. **Gaps and conflicts** — each labelled OBSERVED / HYPOTHESIS / BLOCKED.
+10. **Proposals** — ordered by §13; each with the rule it satisfies, risk, rollback, and whether it needs an operator decision.
+11. **Migration plan** (merge path) or **Update summary** (update path).
+12. **Limits of this report** — what you could not observe and why.
+13. **Verification log** — the final verification pass (guide §9.3): each acceptance item, its state, the command that verified it, and the timestamp.
 
 No conversation content, no key material (guide §1.4).
 
@@ -243,6 +245,8 @@ report: state/switcher-report-2026-10-15.md
 operator_decisions:           # one line each, from the BLOCKED items
   - "owner of the default: <component>"
   - "manual_override_hours: 4"
+second_party_verified:        # guide §9.5: change, who verified it, when
+  - "owner transfer to <component>: verified by <operator|agent>, <date>"
 deferred:                     # rules knowingly not adopted yet, with reason
   - "invariant 9 local-as-main exception: latency not yet measured"
 ```
@@ -270,3 +274,86 @@ If the operator runs several boxes, or wants to contribute back, share a **sanit
 - Put conversation content or key material in a report, ledger, or log.
 - Treat a source read as proof of runtime behavior.
 - Copy an illustrative code block from the specification onto a live box. Tested checks are in `checks/`.
+- Report COMPLETE from evidence gathered before the final verification pass, or from your own earlier summary.
+- Treat your own re-check as independent verification of a high-stakes change (guide §9.5).
+
+---
+
+## 9. Definition of done
+
+You are both the executor and the verifier of your own run. Do the work, then **re-verify every acceptance item against the current state of the box** with fresh commands, not your earlier notes or summary. Only then choose the final status.
+
+### 9.1 Two different questions
+
+- **Is the run complete?** Did you establish everything this guide asks for, with current evidence? That decides **COMPLETE** or **INCOMPLETE**.
+- **Is the box healthy?** Do the rules pass? That is a **finding**, reported in the Rules section.
+
+A rule that **fails** on the box does not make the run incomplete. A rule you **could not verify** does. A finished report that says "the alert path is mute (fail)" is COMPLETE. A report that never checked the alert path is INCOMPLETE.
+
+### 9.2 Acceptance items
+
+Every path:
+
+| # | Item | Verified by |
+|---|---|---|
+| A1 | Repository at a recorded commit; `VERSION` read | `git rev-parse --short HEAD`; `cat VERSION` |
+| A2 | Fixture tests run **in this run**; result recorded | `checks/tests/run.sh` exit code and summary line |
+| A3 | Hermes home resolved from the runtime | The process environment or runtime source you read it from |
+| A4 | Every capability question answered `present` / `absent` / `unknown` | Evidence per answer, or the question that resolves it |
+| A5 | Every invariant (1–44) has an applicability; every applicable one has a check result or a documented manual review with evidence | The Rules table |
+| A6 | Every applicable check in `checks/` run in this run | Command, exit code, timestamp |
+| A7 | Each runtime fact in guide §3.6 is source-verified, live-run-verified, or `unknown` with the command that would settle it | The Runtime facts table |
+| A8 | **Live routing unchanged by the run** | SHA-256 of `config.yaml` and of the scheduler's job listing, taken at the start and the end; they must match. (If the operator changed something meanwhile, say so; that is a foreign write, not yours.) |
+| A9 | Report contains no key material or conversation content | For each provider key variable, with `.env` sourced: `grep -cF -f <(printf '%s\n' "${!VAR}") <report>` returns 0. `printf` is a shell builtin, so the value never appears on a command line; never print it |
+
+Merge path, additionally:
+
+| # | Item | Verified by |
+|---|---|---|
+| M1 | Every writer of the model or fallback list inventoried, with its last exit code and first log line | Inventory table |
+| M2 | Every scheduled writer classified CLOBBER / SAFETY / NEUTRAL | Inventory table |
+| M3 | Every row of the mapping table (guide §4.2) filled for this box | Mapping table |
+| M4 | Migration plan: every step has the rule it satisfies, risk, rollback, and decision flag | Migration plan |
+
+Update path, additionally:
+
+| # | Item | Verified by |
+|---|---|---|
+| U1 | Adoption record read; from-version and from-commit recorded | The record's contents |
+| U2 | Every *Adopters: action required* item between the adopted and current version has an outcome | Update summary |
+| U3 | Every result compared with the last recorded result; changes listed | Comparison table: rule, previous result, current result |
+
+### 9.3 The final verification pass
+
+After the report is drafted, before choosing a status:
+
+1. **Re-run** A1, A2, A6, A8 and A9 now. Do not reuse output from earlier in the run.
+2. **Re-check** every other item against current state: re-open the files, re-read the listings. Don't re-read your own notes.
+3. **Record** each item in the Verification log: item, state, command, timestamp.
+4. If anything differs from the draft, correct the report first, then re-verify the changed items.
+
+Each item ends in one of these states:
+
+| State | Meaning |
+|---|---|
+| **VERIFIED** | Established from evidence produced in this final pass |
+| **FAILED** | Attempted and could not be established (the step errored), with the error |
+| **SKIPPED** | Not attempted, with an allowed reason: the rule is `not-applicable` (capability absent or excluded by policy), or settling it needs an operator answer or a live write you are not permitted to make |
+| **MISSING** | Not done, done with evidence from before this pass, shortened, or timed out without a retry |
+
+A step that timed out is FAILED if retried and still failing, MISSING if not retried. Either way, record the timeout and its limit.
+
+### 9.4 Choosing the status
+
+- **COMPLETE** — every item is VERIFIED or SKIPPED with an allowed reason.
+- **INCOMPLETE** — anything else. List each FAILED or MISSING item first in the report, with:
+  - **the exact missing item** (its number and name);
+  - **why existing evidence is insufficient** (stale, from an earlier run, shortened, errored, ambiguous);
+  - **the exact command or check that would obtain it.**
+
+If one item cannot be completed, mark it and **continue with the rest**, unless continuing is unsafe (for example, the box is degraded and further probing would spend a scarce budget). Then stop, say why, and report INCOMPLETE.
+
+### 9.5 Your own re-check is not independent
+
+Re-verifying your own work catches stale evidence and skipped steps; it does not catch your own blind spots (§19). So any proposal that, once applied, would **transfer ownership of the default, enable or disable a writer or scheduled job, change the fallback list, or turn on a rule's self-tuning** is marked **requires second-party verification**. After the operator applies it, the operator or a **separate** agent, not the one that proposed it, verifies the outcome from current state. Record who verified it in the adoption record.
+
