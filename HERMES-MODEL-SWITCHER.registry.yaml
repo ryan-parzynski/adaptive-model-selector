@@ -15,6 +15,8 @@ paths:
   state_dir:                   # mode-700 state directory
   alert_file:                  # alerts.json
   ledger_file:                 # append-only run ledger
+  observation_ledger_file:     # append-only observation ledger (§30)
+  decision_ledger_file:        # append-only decision ledger with outcome records (§30)
 
 config_keys:
   model_default:               # e.g. "model.default"
@@ -74,6 +76,12 @@ numbers:
     description: "minimum time a tier must be held before a switch away"
   config_writes_per_hour:
     description: "cap on config writes per rolling hour before the system is considered flapping"
+  catalog_min_fraction:
+    description: "a catalog smaller than this fraction of the previous run's count is treated as unreadable (§4.3)"
+    question: "e.g. 0.5; the right value depends on how much a provider's catalog normally fluctuates"
+  ledger_raw_retention_days:
+    description: "days raw observation and decision ledgers are kept before rotation; rollups are kept indefinitely"
+    question: "default 90"
   manual_override_hours:
     description: "how long a manual change pauses the selector before it re-plans"
     question: "default 4; 4–6 recommended. A hold (no expiry) is requested explicitly, not configured here"

@@ -2,6 +2,13 @@
 
 Version history of `HERMES-MODEL-SWITCHER.md`. Each version's detailed notes are at the top of the specification; Record 4 in Part III carries the same history in table form.
 
+## v3.4 — 2026-10-15 — tested checks, edge cases, ledgers
+
+- `checks/`: nine tested checks plus `checks/tests/run.sh` (55 fixture cases). They replace the defective inline scripts in the spec.
+- Drift check compares only declared-shared properties; manifest now catches an edited fallback list.
+- Edge cases: DST/UTC scheduling, kernel-released lock, decimal prices and every price field, empty catalog, delisted default, reset-header formats, single "unalerted" finding, provider-defined answer field, owner-change privilege.
+- §30 observation and decision ledgers; invariants 43 (no conversation content) and 44 (descriptive before self-tuning); `docs/ledger-metrics.md`.
+
 ## v3.3.1 — 2026-10-15 — cleanup
 
 - Cross-references corrected; §26.10 renumbered §26.9.

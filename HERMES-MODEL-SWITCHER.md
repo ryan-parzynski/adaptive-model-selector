@@ -1,3 +1,14 @@
+# v3.4 — tested checks, edge cases, ledgers
+
+Changes in this pass:
+- **Tested checks in `checks/`** with a fixture runner (`checks/tests/run.sh`, 55 cases). The defective inline scripts in §3.11, §8.2, §8.4, §10.1, §10.2, §10.10, §10.13, §10.16 and §10.27 are replaced by pointers to them; the remaining inline blocks stay marked illustrative
+- Drift check compares only properties declared shared; manifest fingerprints the whole config except the switch keys (an edited fallback list is now drift)
+- Edge cases: DST and UTC scheduling (§4.13b), kernel-released tick lock (§27.7), decimal price parsing and every price field (§4.7), empty catalog and delisted default (§4.3), reset-header formats and sanity bound (§4.13a), single "unalerted" finding (§0.6), answer field is a provider fact (§7.2), owner change needs privilege (§4.14), `-I` and sibling imports (§2.5), here-document disk behavior (§10.7)
+- **§30 Observation and decision ledgers**, invariants 43 (no conversation content) and 44 (descriptive before self-tuning); metric cards in `docs/ledger-metrics.md`
+- Registry: `catalog_min_fraction`, `ledger_raw_retention_days`, `observation_ledger_file`, `decision_ledger_file`
+
+---
+
 # v3.3.1 — cleanup pass from 3.3
 
 Changes in this pass:
@@ -67,7 +78,7 @@ Changes in this pass:
 
 # Hermes Model Switcher — Operator's Guide
 
-**Version:** 3.3.1
+**Version:** 3.4
 **Last updated:** 2026-10-15
 **Purpose:** How to keep one or more Hermes boxes switching models safely, audibly, and without the failure modes this guide names.
 **Audience:** Operators of Hermes boxes. Anyone maintaining model routing on a box running the Hermes stack.
@@ -78,7 +89,7 @@ Changes in this pass:
 
 **Integrity:** see `HERMES-MODEL-SWITCHER.sha256`.
 
-**Embedded scripts are illustrative.** Every code block in this document shows the shape of a check or procedure. None is a tested script; several are known to be defective. Do not copy them onto a live box. Tested implementations will ship as files in the repository.
+**Tested checks live in `checks/`.** Where a section has a tested implementation, it says so and links the file; run `checks/tests/run.sh` to verify them against fixtures. Code blocks that remain in this document are **illustrative** — they show the shape of a procedure and are marked as such. Do not copy them onto a live box.
 
 **How to use this document.**
 
@@ -135,6 +146,7 @@ Four principles drive everything below:
 | Hot-path discipline | §27 |
 | Parameter structure | §28 |
 | Weekly review ledger | §29 |
+| Observation and decision ledgers | §30 |
 
 ---
 
@@ -328,6 +340,8 @@ An aggregate report exits 1 if any applicable rule failed, otherwise 2 if any ru
 
 Writing to a log file is **recorded**, not loud. If the destination has not been verified within the window, every fail-loud rule is unmet and the check reports FAIL, not PASS.
 
+**Unalerted boxes report it once.** A new box often has no alert destination. Rather than every fail-loud rule failing separately, invariant 34's check reports a single FAIL — "box is unalerted" — and, if the operator has acknowledged running unalerted (questionnaire P6), names it as an acknowledged limitation. The individual fail-loud rules reference that one finding instead of repeating it. Acknowledging does not make the box loud; it makes the gap visible in one place instead of drowning the report.
+
 **A rule that says "fail loud" is met only when delivery is loud per the definition above.** The phrase "fail loud" in this guide always means "log *and* deliver loudly"; a deployment with no verified destination has no rule that can be met, and the check's result is FAIL, not PASS.
 
 ---
@@ -431,7 +445,7 @@ Send `confirm_expensive_model: false` unless the target tier is explicitly autho
 
 The dashboard typically requires a session cookie obtained via a login endpoint. Read the password from a mode-600 file:
 
-> **Illustrative — not a tested script.** Do not copy into a live box. Known defects in the embedded scripts are listed in the review handoff; tested versions will live as files in the repository.
+> **Illustrative — not a tested script.** Shows the shape of the procedure. Do not copy onto a live box; tested checks are in `checks/`.
 
 ```bash
 umask 077
@@ -442,7 +456,7 @@ Never pass a password on the command line. Never hardcode it in a script.
 
 ### 2.4 Hardened example
 
-> **Illustrative — not a tested script.** Do not copy into a live box. Known defects in the embedded scripts are listed in the review handoff; tested versions will live as files in the repository.
+> **Illustrative — not a tested script.** Shows the shape of the procedure. Do not copy onto a live box; tested checks are in `checks/`.
 
 ```bash
 umask 077
@@ -488,7 +502,7 @@ If the deployment provides a helper (a Python script that imports the switch fun
 
 **The helper's wrapper does the interpreter discovery.** The `.py` file itself does not discover its interpreter; the shell wrapper that invokes it does. The wrapper probes the capability the helper needs, using the same flags the helper will run under:
 
-> **Illustrative — not a tested script.** Do not copy into a live box. Known defects in the embedded scripts are listed in the review handoff; tested versions will live as files in the repository.
+> **Illustrative — not a tested script.** Shows the shape of the procedure. Do not copy onto a live box; tested checks are in `checks/`.
 
 ```bash
 # Discover an interpreter that can import the switch function. The check
@@ -509,7 +523,7 @@ done
 "$PY" -I "{{scripts_dir}}/_model_switch.py" "{{model_id}}" "{{provider}}"
 ```
 
-**Discover interpreters and binaries by capability, not by path.** A path that exists does not imply a capability. Test the module the helper actually needs, with the same interpreter flags the helper will run under (`-I` removes the caller's path and user site-packages from the import search).
+**Discover interpreters and binaries by capability, not by path.** A path that exists does not imply a capability. Test the module the helper actually needs, with the same interpreter flags the helper will run under (`-I` removes the caller's path and user site-packages from the import search — and also the script's own directory, so a helper that imports a sibling module must be packaged or must add its directory explicitly).
 
 **Four live instances of the same trap (illustrative):**
 
@@ -649,29 +663,10 @@ A box that runs two selectors with opposite policies (one free-first, one paid-f
 **Reality:** the probe's default client timeout may be minutes.
 **Fix:** wrap the probe in a hard ceiling, sized to the model class (§7.2). Read the HTTP status explicitly when the probe needs to distinguish outcomes:
 
-> **Illustrative — not a tested script.** Do not copy into a live box. Known defects in the embedded scripts are listed in the review handoff; tested versions will live as files in the repository.
+> **Tested implementation:** [`checks/probe.sh`](checks/probe.sh) — exits 0 pass, 1 fail, 2 cannot-observe; covered by `checks/tests/run.sh`. It reads the HTTP status explicitly, keeps the key off the command line, and asserts on the answer content, so a probe whose budget expired inside the model's thinking reports `probe_budget_too_small` (a probe verdict, Class 7) rather than a dead model.
 
-```bash
-# -w '%{http_code}' prints the status on stdout; no -f, so 4xx/5xx
-# are distinguishable from a timeout (curl exit 28).
-# timeout gets probe_budget + 5 s; curl --max-time gets probe_budget.
-status=$(timeout "$(( {{probe_budget}} + 5 ))" curl -sS -o /dev/null -w '%{http_code}' \
-  --connect-timeout 5 --max-time "{{probe_budget}}" "{{probe_url}}")
-rc=$?
-case "$rc" in
-  0)   case "$status" in
-         200) outcome=ok ;;
-         429) outcome=http_429 ;;
-         *)   outcome=http_error ;;
-       esac ;;
-  28)  outcome=timeout ;;
-  124) outcome=timeout ;;
-  *)   outcome=cannot-observe ;;
-esac
-echo "probe outcome=$outcome http=$status"
-```
 
-`curl -f` collapses every 4xx/5xx into one exit code, which makes a 429, a 403, and a generic 5xx indistinguishable. Read the status explicitly.
+`curl -f` collapses every 4xx/5xx into one exit code, which makes a 429, a 403, and a generic 5xx indistinguishable. Read the status explicitly — and read the body, because HTTP 200 is not an answer (§7.2).
 
 ### 3.12 Latency-based health classifies fast failures as healthy
 
@@ -751,7 +746,7 @@ But `--help` only answers for CLI flags. A slash-command flag, a config value, a
 **Reality:** two entries. Which one wins is parser-dependent. A shell that sources the file with `set -a` typically takes the last match; many `dotenv`-style parsers take the first. A placeholder in the losing position either never applies (harmless) or 401s every provider call (fatal).
 **Fix:** determine the winner on the box, never assume. Sourcing test — **print a hash, never the key or a prefix:**
 
-> **Illustrative — not a tested script.** Do not copy into a live box. Known defects in the embedded scripts are listed in the review handoff; tested versions will live as files in the repository.
+> **Illustrative — not a tested script.** Shows the shape of the procedure. Do not copy onto a live box; tested checks are in `checks/`.
 
 ```bash
 # Source the env file and hash the key's value; the hash identifies which
@@ -943,6 +938,8 @@ Query configured catalogs. Merge results, tag by source.
 - Fetch failure = exit non-zero.
 - Optional catalog failure = WARN, continue.
 - Cache for one run. Do not persist a "last known good" as a fallback.
+- **An empty or implausibly small catalog is CANNOT-OBSERVE, not "no models."** A provider glitch can return HTTP 200 with an empty list. If the catalog is empty, or smaller than a configured fraction of the previous run's count (`{{catalog_min_fraction}}`), hold the current default and alert; do not conclude that the free tier has vanished.
+- **The current default must still be in the catalog.** If it has been delisted, the selector moves new sessions off it even when nothing else changed, and the switch report lists running sessions still bound to it (§3.5) — they will start failing.
 
 **Deliberate narrowing some deployments use:** when the box is on the paid plateau and no decision depends on the free list, a free-catalog fetch failure is a WARN, not fatal. State this in your own §12 record so the next reader does not read it as a regression.
 
@@ -988,7 +985,7 @@ Free means "priced 0/0 in the live catalog." Suffix is one signal; live membersh
 
 ### 4.7 Pricing
 
-Prices are strings, not floats. Missing, empty, or unparseable → reject the model. Do not default to 0. **Negative values are sentinels, not prices** — a provider may send `-1` to mean "unknown"; reject, do not rank.
+Prices are strings, not floats. **Parse them as decimals** (not binary floats, not string comparison): `"0"`, `"0.0"`, `"0.000000"` and `"0e0"` are all zero, and `"1e-7"` is not. Missing, empty, or unparseable → reject the model. Do not default to 0. **Negative values are sentinels, not prices** — a provider may send `-1` to mean "unknown"; reject, do not rank. **Every price field counts**: a model with zero per-token prices but a per-request or other fee is not free, and the fee belongs in the blended cost (§4.8).
 
 ### 4.8 Blended cost
 
@@ -1148,7 +1145,7 @@ A rate-limit reset header on a 429 may describe whichever limit tripped, not the
 - Confirm the header describes the daily limit — from provider docs, or from observed pairs of headers and limits.
 - Sanity-check its value: a reset under ~60 s away usually means a per-minute limit; one landing on the expected daily boundary usually means the daily limit.
 - Cross-check with the counter: if the key endpoint shows daily `remaining` above the reserve, the 429 wasn't the daily limit and the reset header should not be treated as the recovery time.
-- Handle units (seconds or milliseconds since epoch) and clock skew.
+- Handle every format the provider may send: epoch seconds, epoch milliseconds, a delta in seconds (`Retry-After`), or an HTTP date. **Sanity-bound the result:** a parsed instant in the past or more than 48 hours ahead is a parse error — discard it and use the labelled fallback. Account for clock skew.
 
 If any of these is uncertain, treat the 429 as short-term: back off, retry, re-check the counter. Do not hold paid until the daily reset on an ambiguous header. **This stays a HYPOTHESIS until a recorded 429 confirms which limit the header reports.**
 
@@ -1162,7 +1159,7 @@ If any of these is uncertain, treat the 429 as short-term: back off, retry, re-c
 
 **Why the divisibility rule was wrong.** Any `*/N` cron with N dividing 1440 satisfies "period divides reset," including a `*/5` job that misses the window by 40 minutes. What actually matters is how soon after the reset the first tick runs.
 
-**Timezones.** The check must name the timezone the cron schedule runs in, compared with the UTC reset. A `*/5` job that misses the window is often a timezone offset, not a period problem. The restated rule covers timezone, clock skew, and cached counters.
+**Timezones.** The check must name the timezone the cron schedule runs in, compared with the UTC reset. A `*/5` job that misses the window is often a timezone offset, not a period problem. The restated rule covers timezone, clock skew, and cached counters. **Daylight saving time moves a local-time schedule one hour against UTC twice a year,** so a schedule that meets the rule in one season can miss it in the other. Prefer running the selector's schedule in UTC (`CRON_TZ=UTC` or the scheduler's equivalent); otherwise the check evaluates the rule under both offsets.
 
 **If the provider uses a rolling window instead of a fixed daily reset,** the invariant does not apply. State which model the provider uses in the deployment's §12 record, and if the model is rolling, replace the invariant with "the first tick after any 429 re-reads the counter."
 
@@ -1188,7 +1185,7 @@ A selector that rewrites the config on every tick creates churn, hides real chan
 3. **Resolve the target path.** If `{{config_path}}` is a symlink or an alias to a mount point (a home directory mounted twice), rename semantics differ: `os.replace` on the symlink replaces the link, not the target, and cross-filesystem renames fail. Write the temp file **in the same directory as the resolved target**, and `os.replace` the resolved target.
 4. **Write the new config to a temp file in the same directory** (a predictable `/tmp` path is wrong for this — it may be on a different filesystem, and rename across filesystems is not atomic). **Serialize with a round-trip-preserving writer** so comments, key order, and quoting survive; then diff the temp file against the original and abort unless only the intended keys changed (§3.37).
 5. **fsync the temp file.**
-6. **Preserve mode and owner.** Copy the existing file's mode and owner to the temp file before the rename. A rename replaces permissions and ownership with the temp file's; if the config carries inline credentials or is read by a runtime running as another user, changed mode or owner can lock the runtime out or expose the file.
+6. **Preserve mode and owner.** Copy the existing file's mode and owner to the temp file before the rename. A rename replaces permissions and ownership with the temp file's; if the config carries inline credentials or is read by a runtime running as another user, changed mode or owner can lock the runtime out or expose the file. **Changing owner requires privilege:** a selector that does not run as the config's owner cannot `chown`. Run the selector as the config's owner; if it cannot, fail loud and do not write — never leave a config owned by the wrong user.
 7. **`os.replace`** the temp file over the resolved target. One rename: atomic.
 8. **fsync the directory** after the rename. Without it, a crash can lose the rename, even though the file's contents were fsynced.
 9. **Release the lock.**
@@ -1500,7 +1497,7 @@ An active probe fires only when:
   - **Reasoning model** (`reasoning` field present, or the model is being probed as a reasoning target): the timeout must exceed the model's expected thinking time, and max-tokens must exceed its expected thinking length. On the order of 60–120 s and 250+ tokens. The exact figure is a per-model value — measure it once, record it, use it thereafter.
 - **Record the required budget per model.** A model whose first successful probe needed a larger budget carries that budget in the probe's configuration. Do not rediscover it on every run.
 - **If a probe times out with no output, that is a probe verdict, not a model verdict.** Raise the budget and re-run before drawing any conclusion. A probe that returns `finish_reason: length` with an empty answer is likewise a probe verdict.
-- **Assert on the answer content, not on the transport.** HTTP 200 plus a token count is not evidence of a healthy model. Check that the answer field is non-empty. A runtime that exposes the reasoning separately will show a non-empty `thinking` with an empty `response` when the model is still thinking — "in progress," not "broken."
+- **Assert on the answer content, not on the transport.** HTTP 200 plus a token count is not evidence of a healthy model. Check that the answer field is non-empty. A runtime that exposes the reasoning separately will show a non-empty `thinking` with an empty `response` when the model is still thinking — "in progress," not "broken." **Which field is "the answer" is a provider fact**, defined by the provider adapter; some models put their entire output in a reasoning field when the token budget is tight. A non-empty reasoning field with an empty answer and `finish_reason: length` is a probe-budget verdict, not an answer.
 - **Timeout is necessary but not sufficient.** A hard timeout bounds *silence*, not *total wall time*. A card that answers inside the budget may still take 9 s or more; a card that never answers hits the timeout and falls through. See §4.18 and §6.4a for how the fall-through interacts with the head choice.
 
 **The trap this rule replaces:** a fixed timeout applied uniformly. In a deployment where reasoning is the primary workload, a fixed timeout maps `timeout → hung → BREACH → default switch`. A healthy reasoning model drives a fallback that its own probe caused. See Class 7 for the worked instance.
@@ -1604,158 +1601,20 @@ Two boxes with "the same" config drift. The default state is drift, not parity.
 
 ### 8.2 A drift check
 
-Run periodically. It exits with one of **three** codes: **0 = match**, **1 = drift**, **2 = cannot-observe**. It **does not** report "no drift" from a failed read, and it **does not** treat a comparison that failed on both sides as a match.
+Run periodically. It exits with one of **three** codes: **0 = match**, **1 = drift**, **2 = cannot-observe**. It **does not** report "no drift" from a failed read, and it **does not** treat a comparison that failed on both sides as a match. **Boxes are independent by default:** only properties the operator declares shared are compared; every other difference is expected.
 
-> **Illustrative — not a tested script.** Do not copy into a live box. Known defects in the embedded scripts are listed in the review handoff; tested versions will live as files in the repository.
+> **Tested implementation:** [`checks/compare-boxes.sh`](checks/compare-boxes.sh) — exits 0 pass, 1 fail, 2 cannot-observe; covered by `checks/tests/run.sh`. It compares only properties declared shared in `state/shared-properties.txt` (questionnaire P7), resolves the peer's home from the peer's environment, and treats a usage error as cannot-observe.
 
-```bash
-#!/usr/bin/env bash
-# compare-boxes.sh — run from one box, compares against another.
-# Exit codes: 0 match, 1 drift, 2 cannot-observe.
-set -uo pipefail
 
-REMOTE="$1"
-HERMES_HOME="${HERMES_HOME:-$(python3 -c 'import os; print(os.path.join(os.path.expanduser("~"), ".hermes"))')}"
-ACCEPTED="${ACCEPTED:-$HERMES_HOME/state/accepted-diffs.txt}"
-FAIL=0
-UNOBS=0
+**Properties the script depends on:**
 
-fail() { echo "DRIFT: $1"; FAIL=$((FAIL + 1)); }
-unobs() { echo "CANNOT-OBSERVE: $1"; UNOBS=$((UNOBS + 1)); }
+1. **No quoting across ssh.** Programs that run on both sides are sent on stdin (`python3 -`, `bash -s`), never as quoted strings inside an ssh command — the v3.2 inline version could never run its Python on either side.
+2. **Exit status.** Failures and read errors are counted separately; failure outranks cannot-observe (§0.6). Two failed reads are not a match.
+3. **Process substitution is not covered by `pipefail`.** Remote output is staged to a file and the `ssh` exit code is checked explicitly.
+4. **`.git` exclusion.** A versioned scripts directory contains `.git/` files that differ per box.
+5. **Homes from the runtime.** Neither side's home is guessed from `~` (§1.3).
 
-# Skip any comparison named in the accepted-differences file.
-skip_accepted() {
-  local comparison="$1"
-  [ -f "$ACCEPTED" ] && grep -q "^${comparison}$" "$ACCEPTED"
-}
-
-# Resolve the remote home. A failed ssh is CANNOT-OBSERVE, not drift.
-if ! REMOTE_HOME_RAW=$(ssh "$REMOTE" 'python3 -c "import os; print(os.path.expanduser(\"~\"))"'); then
-  unobs "cannot read remote home"
-  REMOTE_HOME=""
-else
-  REMOTE_HOME="$REMOTE_HOME_RAW/.hermes"
-fi
-
-TMP=$(mktemp -d); trap 'rm -rf "$TMP"' EXIT
-chmod 700 "$TMP"
-
-echo "== script hashes =="
-if [ -n "$REMOTE_HOME" ]; then
-  # Stage remote output to a file. A failed ssh must not appear as empty
-  # output for the diff; check the exit code explicitly.
-  if ! ssh "$REMOTE" "cd '$REMOTE_HOME/scripts' 2>/dev/null && \
-        find . -type f -not -path './.git/*' -exec sha256sum {} \; | sort" \
-      > "$TMP/remote_hashes.txt" 2>/dev/null; then
-    unobs "remote script hash read failed"
-  else
-      (cd "$HERMES_HOME/scripts" && find . -type f -not -path './.git/*' -exec sha256sum {} \; | sort) \
-        > "$TMP/local_hashes.txt" 2>/dev/null
-      if [ ! -s "$TMP/local_hashes.txt" ]; then
-        unobs "local script hash read failed"
-      else
-        if ! skip_accepted "scripts"; then
-          if ! diff "$TMP/remote_hashes.txt" "$TMP/local_hashes.txt"; then
-            fail "scripts differ"
-          fi
-        fi
-      fi
-    fi
-  fi
-
-  echo "== top-level config keys =="
-  if python3 -c "
-  import yaml, sys, os
-  try:
-      print(sorted(yaml.safe_load(open(os.path.join('$HERMES_HOME','config.yaml'))).keys()))
-  except Exception as e:
-      sys.exit(2)
-  " > "$TMP/local_keys.txt" 2>/dev/null; then
-    if [ -n "$REMOTE_HOME" ]; then
-      if ssh "$REMOTE" "python3 -c \\\"
-  import yaml, sys, os
-  try:
-      print(sorted(yaml.safe_load(open(os.path.join('$REMOTE_HOME','config.yaml'))).keys()))
-  except Exception as e:
-      sys.exit(2)
-  \\\"" > "$TMP/remote_keys.txt" 2>/dev/null; then
-        if ! skip_accepted "config_keys"; then
-          if ! diff "$TMP/remote_keys.txt" "$TMP/local_keys.txt"; then
-            fail "config keys differ"
-          fi
-        fi
-      else
-        unobs "remote config read failed"
-      fi
-    fi
-  else
-    unobs "local config read failed"
-  fi
-
-  echo "== scheduled jobs (names only; ids differ by design) =="
-  if [ -n "$REMOTE_HOME" ]; then
-    if ! ssh "$REMOTE" 'hermes cron list' > "$TMP/remote_jobs.txt" 2>/dev/null; then
-      unobs "remote cron list failed"
-    else
-      if ! hermes cron list > "$TMP/local_jobs.txt" 2>/dev/null; then
-        unobs "local cron list failed"
-      else
-        # Extract the job *name* column; ids differ, names shouldn't.
-              awk '/^[a-f0-9]+[[:space:]]/{print $2}' "$TMP/remote_jobs.txt" | sort -u > "$TMP/rj.txt"
-              awk '/^[a-f0-9]+[[:space:]]/{print $2}' "$TMP/local_jobs.txt"  | sort -u > "$TMP/lj.txt"
-        if ! skip_accepted "job_names"; then
-          if ! diff "$TMP/rj.txt" "$TMP/lj.txt"; then
-            fail "job names differ"
-          fi
-        fi
-      fi
-    fi
-  fi
-
-  echo "== alert delivery capability =="
-  if ! hermes send -l > "$TMP/local_send.txt" 2>&1; then
-    unobs "local send -l failed"
-  else
-    if [ -n "$REMOTE_HOME" ]; then
-      if ! ssh "$REMOTE" 'hermes send -l' > "$TMP/remote_send.txt" 2>&1; then
-        unobs "remote send -l failed"
-      else
-        # Compare the *set of channel kinds*, not full output; the two boxes
-        # may show different channels by design.
-        # Parse channel kinds from a stable section format: "kind: details"
-        awk '/^[A-Za-z]+:/{print $1}' "$TMP/remote_send.txt" | sed 's/:$//' | sort -u > "$TMP/rkinds.txt" || true
-        awk '/^[A-Za-z]+:/{print $1}' "$TMP/local_send.txt"  | sed 's/:$//' | sort -u > "$TMP/lkinds.txt" || true
-        if ! skip_accepted "alert_delivery"; then
-          if ! diff "$TMP/rkinds.txt" "$TMP/lkinds.txt"; then
-            fail "alert-delivery kinds differ"
-          fi
-        fi
-      fi
-    fi
-  fi
-
-echo
-if [ "$UNOBS" -gt 0 ]; then
-  echo "CANNOT-OBSERVE: $UNOBS comparison(s) could not be completed"
-  [ "$FAIL" -gt 0 ] && echo "DRIFT: $FAIL comparison(s) failed"
-  exit 2
-fi
-if [ "$FAIL" -gt 0 ]; then
-  echo "DRIFT: $FAIL comparison(s) failed"
-  exit 1
-fi
-echo "no drift: all comparisons matched"
-exit 0
-```
-
-**Four properties the script depends on:**
-
-1. **Path expansion.** A literal `~` in a Python `open()` is not a path. Use `os.path.expanduser()` or `Path.home()`.
-2. **Exit status.** The check accumulates failures and distinguishes "match" from "could not read." A read error fails the check. Two failed reads are not a match.
-3. **Process substitution is not covered by `pipefail`.** A failed `ssh` inside `<(…)` reads as empty output, which would then be compared and reported as DRIFT. The script above stages remote output to a file and checks the `ssh` exit code explicitly.
-4. **`.git` exclusion.** A versioned scripts directory contains `.git/` files that differ per box. Exclude `./.git/*`.
-
-**A check that always fails gets ignored, which is as bad as one that always passes.** So the drift check allows for accepted differences (§8.3): cron ids differ by design, alert-delivery mechanism may differ, one box may have local hardware the other doesn't. Compare what should match; allow the rest to differ, and record why in §8.3.
+**A check that always fails gets ignored, which is as bad as one that always passes.** So the drift check compares only what is declared shared: cron ids differ by design, alert-delivery mechanism may differ, one box may have local hardware the other doesn't. Record intentional differences in §8.3.
 
 ### 8.3 Accepting intentional differences
 
@@ -1772,76 +1631,15 @@ Recorded differences are contracts, not oversights. Unrecorded differences are f
 
 ### 8.4 Single-box hash manifest
 
-> **Illustrative — not a tested script.** Do not copy into a live box. Known defects in the embedded scripts are listed in the review handoff; tested versions will live as files in the repository.
+> **Tested implementation:** [`checks/manifest.sh`](checks/manifest.sh) — exits 0 pass, 1 fail, 2 cannot-observe; covered by `checks/tests/run.sh`. It fingerprints the whole config except the keys a legitimate switch changes, so an edited fallback list is drift and a model switch is not.
 
-```bash
-#!/usr/bin/env bash
-# manifest.sh — record a known-good state; compare on each run.
-# Exit codes: 0 match, 1 drift, 2 cannot-observe.
-set -euo pipefail
 
-HERMES_HOME="${HERMES_HOME:-$(python3 -c 'import os; print(os.path.join(os.path.expanduser("~"), ".hermes"))')}"
-# Defaults to $HOME/.hermes if HERMES_HOME is not set.
-export HERMES_HOME
-MANIFEST="${MANIFEST:-$HERMES_HOME/state/known-good.manifest}"
-MODE="${1:-check}"   # "record" or "check"
+**Properties this script depends on:**
 
-# Compute the current state; a read error must be a distinct sentinel, not
-# the same text as another error.
-compute() {
-  if ! (cd "$HERMES_HOME/scripts" && find . -type f -not -path './.git/*' \
-         -exec sha256sum {} \; | sort); then
-    echo "CANNOT-OBSERVE: scripts unreadable"; return 2
-  fi
-  if ! sha256sum "$HERMES_HOME/scripts/_model_switch.py" 2>/dev/null; then
-      echo "CANNOT-OBSERVE: specific script missing"; return 2
-    fi
-  # Hash only the *key set* of the config, not the file bytes: a legitimate
-  # model switch changes the file and must not appear as drift.
-  python3 -c "
-import yaml, os, sys, hashlib, json
-p = os.path.join(os.environ.get('HERMES_HOME',''), 'config.yaml')
-try:
-    cfg = yaml.safe_load(open(p))
-except Exception:
-    sys.exit(2)
-keys = sorted((cfg or {}).keys())
-print(hashlib.sha256(json.dumps(keys).encode()).hexdigest(), 'config-keys')
-" || { echo "CANNOT-OBSERVE: config unreadable"; return 2; }
-}
-
-record() {
-  if ! compute > "$MANIFEST.tmp"; then
-    rm -f "$MANIFEST.tmp"; echo "record failed: state unreadable" >&2; exit 2
-  fi
-  mv "$MANIFEST.tmp" "$MANIFEST"
-  echo "recorded: $MANIFEST"
-}
-
-check() {
-  [ -r "$MANIFEST" ] || { echo "CANNOT-OBSERVE: no manifest"; exit 2; }
-  TMP=$(mktemp); trap 'rm -f "$TMP"' EXIT
-  if ! compute > "$TMP"; then
-    echo "CANNOT-OBSERVE: current state unreadable"; exit 2
-  fi
-  if ! diff "$MANIFEST" "$TMP"; then
-    echo "DRIFT from recorded state"; exit 1
-  fi
-  echo "matches recorded state"; exit 0
-}
-
-case "$MODE" in
-  record) record ;;
-  check)  check ;;
-  *)      echo "usage: $0 {record|check}" >&2; exit 2 ;;
-esac
-```
-
-**Three properties this script gets right that the naive version does not:**
-
-1. **An unreadable config is not written into the manifest as text.** If the read fails, `compute` returns non-zero and the manifest is not updated. Two failed reads do not match; they both fail.
-2. **The config's hash is over its top-level key set, not its bytes.** A legitimate model switch changes the bytes of `config.yaml`; hashing the bytes would report drift on every switch. The key set is what should match across runs; the values legitimately differ.
-3. **Defaults come from `HERMES_HOME` resolved as a path**, not from a literal `{{hermes_home}}` default.
+1. **An unreadable config is not written into the manifest.** If any read fails, nothing is recorded and a check exits cannot-observe.
+2. **The config fingerprint excludes only the keys a switch changes** (`{{model_default}}`, `{{model_provider}}`). Hashing only the top-level key set — the v3.2 approach — missed an edited fallback list, which is exactly the change invariants 2 and 9 care about.
+3. **`HERMES_HOME` must be set**, resolved from the runtime; there is no `~/.hermes` default (§1.3).
+4. **Tool dependencies are part of the state**, so a package removed by a rebuild is drift (§8.1).
 
 ---
 
@@ -1895,6 +1693,8 @@ Set by hand unless noted. Verify on both boxes. **This is the canonical invarian
 40. (R-40) **Local inference ports have explicit access control (§26.9)** — ports bind to loopback or the tailnet interface only, have a tailnet ACL allowing only named devices, and require authentication on web UIs. A check that cannot observe the refusal reports CANNOT-OBSERVE.
 41. (R-41) **Foreign writes pause the selector** — if the saved default differs from both the selector's last write and its current choice, another writer changed it. The selector enters the manual-override pause (§4.14a), writes nothing, and never reverts the change. The pause ends after `{{manual_override_hours}}` hours (default 4), immediately on an explicit resume, or — when the operator asked for a hold — only on an explicit resume.
 42. (R-42) **Limits are read, not remembered** — the free allowance, credit and spend limits, and their structure (counter, window type, reset instant) are read from the provider on every tick through the provider adapter. No script hardcodes a provider's limit numbers. A limit that cannot be read makes dependent checks CANNOT-OBSERVE.
+43. (R-43) **Ledgers hold no conversation content** — model ids, counts, durations, timestamps, status classes, quota values, reason codes and opaque session ids only; never prompts, responses, message text, tool arguments, file paths, URLs, or user-identifying data (§30.5). Cross-box sharing is a sanitized lessons export, never a raw ledger.
+44. (R-44) **Ledgers are descriptive before they are prescriptive** — no rule tunes itself from ledger history until that metric's sample floor is met and the operator enables tuning for that rule (§30.8).
 
 ---
 
@@ -1906,30 +1706,15 @@ Each check runs only for rules that are **applicable** on this box (§0.6). Rule
 
 ### 10.1 The switch path works
 
-> **Illustrative — not a tested script.** Do not copy into a live box. Known defects in the embedded scripts are listed in the review handoff; tested versions will live as files in the repository.
+> **Tested implementation:** [`checks/switch-path.sh`](checks/switch-path.sh) — exits 0 pass, 1 fail, 2 cannot-observe; covered by `checks/tests/run.sh`. **It writes config**, so it refuses to run unless `SWITCH_CHECK_SCRATCH=1` marks a scratch home.
 
-```bash
-# Run the WRAPPER, not the .py file directly. The wrapper (§2.5) does the
-# interpreter capability probe. Running the .py directly skips that step
-# and writes config outside the owner gate.
-if ! "{{scripts_dir}}/_model_switch.sh" "{{model_id}}" "{{provider}}"; then
-  echo "switch helper failed (exit $?)"; exit 1
-fi
-echo "switch helper OK"
-```
 
 A direct invocation of the `.py` file skips the interpreter check (§2.5), and it is a live config write by a component that may not be the owner (§3.7, invariant 21). Both are defects.
 
 ### 10.2 No hardcoded model ids in the selector
 
-> **Illustrative — not a tested script.** Do not copy into a live box. Known defects in the embedded scripts are listed in the review handoff; tested versions will live as files in the repository.
+> **Tested implementation:** [`checks/no-hardcoded-ids.sh`](checks/no-hardcoded-ids.sh) — exits 0 pass, 1 fail, 2 cannot-observe; covered by `checks/tests/run.sh`. A missing or unreadable selector is cannot-observe, not a pass.
 
-```bash
-if grep -rn '{{specific_vendor}}/' "{{scripts_dir}}/{{selector_script}}"; then
-  echo "hardcoded model id found"; exit 1
-fi
-echo "no hardcoded ids"
-```
 
 Zero hits. A literal in an assignment is a bug.
 
@@ -1959,11 +1744,11 @@ Source `.env` before any key test. A 401 from a test that did not source `.env` 
 
 The API key is not placed on the `curl` command line. Use a mode-600 config file, or stdin:
 
-> **Illustrative — not a tested script.** Do not copy into a live box. Known defects in the embedded scripts are listed in the review handoff; tested versions will live as files in the repository.
+> **Illustrative — not a tested script.** Shows the shape of the procedure. Do not copy onto a live box; tested checks are in `checks/`.
 
 ```bash
 set -a; . "{{hermes_home}}/.env"; set +a
-# curl reads the auth from stdin; nothing touches disk.
+# curl reads the auth from stdin, never from argv.
 curl -s --connect-timeout 5 --max-time 15 --config - \
   "{{quota_endpoint}}" <<EOF | jq '{
     is_free_tier: .data.is_free_tier,
@@ -1973,11 +1758,11 @@ header = "Authorization: Bearer ${{provider_key_var}}"
 EOF
 ```
 
-The key reaches `curl` without appearing in argv. `--config -` reads the config from standard input; nothing is written to disk and nothing is left behind if the process is killed. (Invariant 31.)
+The key reaches `curl` without appearing in argv. `--config -` reads the config from standard input. Whether the here-document touches disk depends on the shell: bash 5.1 and later pass small here-documents through a pipe; older versions write a short-lived temporary file readable only by the user. Either way the key never appears on a command line. (Invariant 31.)
 
 ### 10.8 Did another writer clobber your write?
 
-> **Illustrative — not a tested script.** Do not copy into a live box. Known defects in the embedded scripts are listed in the review handoff; tested versions will live as files in the repository.
+> **Illustrative — not a tested script.** Shows the shape of the procedure. Do not copy onto a live box; tested checks are in `checks/`.
 
 ```bash
 grep 'Model switched in-place' "{{hermes_home}}/logs/agent.log" | tail -20
@@ -1989,7 +1774,7 @@ Compare your write timestamp to the latest switch line.
 
 ### 10.9 Are task assignees real?
 
-> **Illustrative — not a tested script.** Do not copy into a live box. Known defects in the embedded scripts are listed in the review handoff; tested versions will live as files in the repository.
+> **Illustrative — not a tested script.** Shows the shape of the procedure. Do not copy onto a live box; tested checks are in `checks/`.
 
 ```bash
 {{task_system}} assignees
@@ -2000,11 +1785,8 @@ Any `ON DISK: no` is a phantom.
 
 ### 10.10 Does `.env` have duplicates?
 
-> **Illustrative — not a tested script.** Do not copy into a live box. Known defects in the embedded scripts are listed in the review handoff; tested versions will live as files in the repository.
+> **Tested implementation:** [`checks/env-duplicates.sh`](checks/env-duplicates.sh) — exits 0 pass, 1 fail, 2 cannot-observe; covered by `checks/tests/run.sh`. It counts `KEY=`, `export KEY=`, and spaced forms.
 
-```bash
-grep -c "^$( printf '%s' '{{provider_key_var}}' )=" "{{hermes_home}}/.env"
-```
 
 Count > 1 is a bug. Also check `{{config_path}}` for an inline placeholder credential that shadows the file (§3.23).
 
@@ -2014,7 +1796,7 @@ Run the validator against a sanitized copy of the real config, plus at least one
 
 ### 10.12 Alert path check
 
-> **Illustrative — not a tested script.** Do not copy into a live box. Known defects in the embedded scripts are listed in the review handoff; tested versions will live as files in the repository.
+> **Illustrative — not a tested script.** Shows the shape of the procedure. Do not copy onto a live box; tested checks are in `checks/`.
 
 ```bash
 hermes send -l
@@ -2028,48 +1810,16 @@ cat "{{hermes_home}}/gateway_state.json" 2>/dev/null | jq '.platforms'
 
 ### 10.13 Timeout sanity — fails on absence and on out-of-range
 
-> **Illustrative — not a tested script.** Do not copy into a live box. Known defects in the embedded scripts are listed in the review handoff; tested versions will live as files in the repository.
+> **Tested implementation:** [`checks/stream-timeout.py`](checks/stream-timeout.py) — exits 0 pass, 1 fail, 2 cannot-observe; covered by `checks/tests/run.sh`. The key is a dotted path from the registry, so its location is not assumed.
 
-```bash
-python3 - <<'PY'
-import os, yaml, sys
-h = os.environ.get("HERMES_HOME") or (os.path.expanduser("~") + "/.hermes")
-try:
-    cfg = yaml.safe_load(open(os.path.join(h, "config.yaml")))
-except Exception as e:
-    print(f"CANNOT-OBSERVE: config unreadable: {e}", file=sys.stderr)
-    sys.exit(2)
-# The key the runtime reads. On most builds this is the local-stream variant.
-# The placeholder resolves from the registry; substitute the actual key
-# before deployment.
-key = "{{stream_stale_timeout_key}}"
-agent = cfg.get("agent") or {}
-v = agent.get(key)
-if v is None:
-    print(f"{key} is not set (a missing value is a defect)")
-    sys.exit(1)
-if not isinstance(v, (int, float)) or v <= 0:
-    print(f"{key} is not a positive number: {v!r}")
-    sys.exit(1)
-mn = {{stream_stale_min}}
-mx = {{stream_stale_max}}
-if v < mn:
-    print(f"{key} below working minimum: {v} < {mn}")
-    sys.exit(1)
-if v > mx:
-    print(f"{key} above working maximum: {v} > {mx}")
-    sys.exit(1)
-print(f"{key} = {v} (in range)")
-PY
-```
 
-**Absence fails.** A zero or negative value fails. A value below the working minimum fails. A **read error** exits 2 (CANNOT-OBSERVE), not 1.
+**Absence fails.** A zero, negative, or boolean value fails. A value outside the working range fails. A **read error** exits 2 (CANNOT-OBSERVE), not 1.
 
 The key is a registry placeholder, not a hardcoded literal. A check that hardcodes the key while the rest of the guide uses a placeholder is the same class of defect as a rule stated twice.
 
 ### 10.14 Verify a CLI flag exists before using it
 
-> **Illustrative — not a tested script.** Do not copy into a live box. Known defects in the embedded scripts are listed in the review handoff; tested versions will live as files in the repository.
+> **Illustrative — not a tested script.** Shows the shape of the procedure. Do not copy onto a live box; tested checks are in `checks/`.
 
 ```bash
 {{command}} --help 2>&1 | grep -i {{flag}} || echo "no {{flag}} on this version"
@@ -2083,24 +1833,10 @@ See §8.2. Exit codes 0 / 1 / 2. Compare the output; do not report "no drift" wh
 
 ### 10.16 Reserved vs spent
 
-> **Illustrative — not a tested script.** Do not copy into a live box. Known defects in the embedded scripts are listed in the review handoff; tested versions will live as files in the repository.
+> **Tested implementation:** [`checks/reserve-vs-spent.sh`](checks/reserve-vs-spent.sh) — exits 0 pass, 1 fail, 2 cannot-observe; covered by `checks/tests/run.sh`. Both directions are checked; a non-numeric or empty reading is cannot-observe.
 
-```bash
-remaining=$({{read_remaining}})
-reserve=${FREE_RESERVE:-{{reserve}}}
-cur=$({{read_current_tier}})
-if [ -z "$remaining" ]; then
-  echo "CANNOT-OBSERVE: remaining is empty (quota read failed)"
-  exit 2
-fi
-if [ "$remaining" -le "$reserve" ] && [ "$cur" != "paid" ]; then
-  echo "POLICY MISMATCH: spent-below-reserve but current is not paid"
-  exit 1
-fi
-exit 0
-```
 
-An empty `remaining` is CANNOT-OBSERVE (exit 2), not PASS.
+An empty or non-numeric `remaining` is CANNOT-OBSERVE (exit 2), not PASS.
 
 ### 10.17 Post-hop verification is present and runs
 
@@ -2108,7 +1844,7 @@ Confirm a `verify-*.sh` exists and a one-shot schedule invokes it after the expe
 
 ### 10.18 Owner confirmed
 
-> **Illustrative — not a tested script.** Do not copy into a live box. Known defects in the embedded scripts are listed in the review handoff; tested versions will live as files in the repository.
+> **Illustrative — not a tested script.** Shows the shape of the procedure. Do not copy onto a live box; tested checks are in `checks/`.
 
 ```bash
 {{scheduler}} list | grep -iE 'selector|failover|autoswitch'
@@ -2123,7 +1859,7 @@ Exactly one entry is active. Every other writer is paused or refuses to write. *
 
 The scopes are `/model` sub-command flags, not top-level CLI flags, so `--help` cannot list them. The scope table is in §2.6. Verify from the source and then from live behavior:
 
-> **Illustrative — not a tested script.** Do not copy into a live box. Known defects in the embedded scripts are listed in the review handoff; tested versions will live as files in the repository.
+> **Illustrative — not a tested script.** Shows the shape of the procedure. Do not copy onto a live box; tested checks are in `checks/`.
 
 ```bash
 # Source check — the parser owns the flags:
@@ -2141,7 +1877,7 @@ Record the result in the deployment's §12 record under "Scoped `/model` default
 
 ### 10.20 Every shelled-out tool exists
 
-> **Illustrative — not a tested script.** Do not copy into a live box. Known defects in the embedded scripts are listed in the review handoff; tested versions will live as files in the repository.
+> **Illustrative — not a tested script.** Shows the shape of the procedure. Do not copy onto a live box; tested checks are in `checks/`.
 
 ```bash
 missing=0
@@ -2157,7 +1893,7 @@ A missing tool must fail the last run loudly (invariant 25). If the run log says
 
 ### 10.21 Selector scripts are versioned
 
-> **Illustrative — not a tested script.** Do not copy into a live box. Known defects in the embedded scripts are listed in the review handoff; tested versions will live as files in the repository.
+> **Illustrative — not a tested script.** Shows the shape of the procedure. Do not copy onto a live box; tested checks are in `checks/`.
 
 ```bash
 git -C "{{scripts_dir}}" rev-parse --is-inside-work-tree 2>/dev/null || {
@@ -2185,7 +1921,7 @@ Compare the tier table's families against the live catalog. Log families that ar
 
 For each model in the health probe's configuration, confirm the timeout and max-tokens are sized to that model's class. A reasoning model with a fixed chat-class timeout is a defect.
 
-> **Illustrative — not a tested script.** Do not copy into a live box. Known defects in the embedded scripts are listed in the review handoff; tested versions will live as files in the repository.
+> **Illustrative — not a tested script.** Shows the shape of the procedure. Do not copy onto a live box; tested checks are in `checks/`.
 
 ```bash
 grep -n -i 'timeout\|max_tokens\|num_predict' "{{scripts_dir}}/{{health_script}}" 2>/dev/null
@@ -2206,19 +1942,8 @@ Each case logs its class, not just "failed." See §4.9, invariant 30.
 
 ### 10.27 Confirm no secret is on a command line
 
-> **Illustrative — not a tested script.** Do not copy into a live box. Known defects in the embedded scripts are listed in the review handoff; tested versions will live as files in the repository.
+> **Tested implementation:** [`checks/no-secrets-on-argv.sh`](checks/no-secrets-on-argv.sh) — exits 0 pass, 1 fail, 2 cannot-observe; covered by `checks/tests/run.sh`. It flags inline auth headers, `curl -u`, and `jq --arg` with key-, password-, token- or secret-named variables, and does not flag the safe `curl --config` here-document form.
 
-```bash
-# Static scan of the scripts for the shapes that leak secrets.
-# The dynamic `ps` snapshot almost never catches a curl call (it lasts <1s),
-# so the static scan is the real check.
-hits=$(grep -rnE '(-H|--header)[[:space:]]+["'"'"']Authorization|--arg[[:space:]]+[a-z]+[[:space:]]+"\$[A-Z_]*KEY|Bearer[[:space:]]+\$' \
-  "{{scripts_dir}}/" 2>/dev/null | wc -l)
-case "$hits" in
-  0) exit 0 ;;
-  *) exit 1 ;;
-esac
-```
 
 Zero hits. A key on `curl`'s argv is visible to any local user via `/proc`. The static scan is what catches it before the next edit re-introduces the pattern; see §20.16.
 
@@ -2226,7 +1951,7 @@ Zero hits. A key on `curl`'s argv is visible to any local user via `/proc`. The 
 
 Two checks, both required:
 
-> **Illustrative — not a tested script.** Do not copy into a live box. Known defects in the embedded scripts are listed in the review handoff; tested versions will live as files in the repository.
+> **Illustrative — not a tested script.** Shows the shape of the procedure. Do not copy onto a live box; tested checks are in `checks/`.
 
 ```bash
 # Source check: look for a timeout-named fallback reason.
@@ -2437,6 +2162,7 @@ This is a **priority order**, not a restatement of rules. Each item names the ru
 33. **Answer the capability questions** so each rule's applicability is known, not guessed. `docs/capability-questionnaire.md`; §0.6.
 34. **Confirm the selector stands down on a manual change** and that its pause window is set. Invariant 41; §10.34.
 35. **Confirm limits are read live**, with no hardcoded provider numbers. Invariant 42; §10.35.
+36. **Start the observation and decision ledgers** before tuning anything; confirm they hold no conversation content. Invariants 43, 44; §30.
 
 ---
 
@@ -2522,6 +2248,9 @@ Most of this list is generated from invariants. The rest names a failure mode no
 - Do not hardcode a provider's limit numbers (42).
 - Do not rewrite a hand-edited config with a writer that drops comments.
 - Do not fall back to a model that shares the failed dependency.
+- Do not record conversation content in any ledger (43).
+- Do not let a rule tune itself from ledger history before its sample floor is met and tuning is enabled (44).
+- Do not sample per-session draws; the reserve needs the largest one.
 
 ---
 
@@ -2540,6 +2269,7 @@ Most of this list is generated from invariants. The rest names a failure mode no
 - The hot-path discipline → §27.
 - The parameter structure → §28.
 - The weekly review ledger → §29.
+- The observation and decision ledgers → §30; metric cards in `docs/ledger-metrics.md`.
 
 **Shell and tool pitfalls (each cost an hour in practice):**
 
@@ -2834,6 +2564,9 @@ The list below names the **patterns** the rules exist to prevent. The incident h
 | **Run ledger** | An append-only JSONL file with one record per selector run, for the weekly review (§29). |
 | **Heartbeat** | The current-state file, overwritten each run (`alerts.json`) (§29.1). |
 | **Foreign write** | A change to the saved default that matches neither the selector's last write nor its current choice (§4.14). |
+| **Observation ledger** | Append-only raw facts: limit snapshots, request samples, per-session draws, capability changes (§30.1). |
+| **Decision ledger** | Append-only record of switches, holds, fallbacks and overrides, with reason codes and later outcome records (§30.1). |
+| **Reason code** | A fixed, enumerated code explaining a decision; never free text (§30.2). |
 | **Manual-override pause** | The state the selector enters after a foreign write: no writes until the window expires, an explicit resume, or — for a hold — only an explicit resume (§4.14a). |
 
 ---
@@ -2990,7 +2723,7 @@ Frame: cost tracks the cost of a wrong decision AND how long the error would sta
 ### 27.7 The two failure modes
 
 - **Hot path — I/O creep.** One more file read or endpoint call per prompt; looks harmless in one test; shows as latency under load. Guard: blocked-network test + per-prompt counter of file reads and network calls (fails above zero).
-- **Tick path — overrun and overlap.** Tick exceeds its schedule period, or two ticks run at once and one reads a half-written state file. Guards: lockfile with a timeout; tick duration budget below the schedule period; atomic stage-and-rename for every state write; heartbeat staleness rule catching a stopped tick.
+- **Tick path — overrun and overlap.** Tick exceeds its schedule period, or two ticks run at once and one reads a half-written state file. Guards: a kernel-released lock (`flock -n` on a dedicated lock file, so a crashed tick cannot leave a stale lock; not reliable on network filesystems — keep the lock file local); tick duration budget below the schedule period; atomic stage-and-rename for every state write; heartbeat staleness rule catching a stopped tick.
 
 ### 27.8 Facts to gather per box
 
@@ -3088,6 +2821,59 @@ The staleness threshold is a multiple of the producer's schedule period (`{{ledg
 
 
 
+
+
+---
+
+## §30 — Observation and decision ledgers
+
+§29 shows whether the selector is *running*. This section records the evidence needed to *tune* it: the values this guide says to measure rather than copy (reserve, local latency, θ, override window, thresholds). Without this history those values stay judgment calls forever (§28.3).
+
+### 30.1 Two ledgers, linked
+
+- **Observation ledger** (`{{observation_ledger_file}}`) — raw facts, append-only: quota and limit snapshots, request samples, aux-call overlap samples, per-session draws, capability changes.
+- **Decision ledger** (`{{decision_ledger_file}}`) — what the selector did and why: switches, holds, fallback events, manual-override pauses and resumes, and later **outcome** records.
+
+A decision references the observations it used by id; it does not copy them. Keeping the two apart keeps a review readable: a week of latency samples does not bury the five decisions that mattered.
+
+### 30.2 Decision records
+
+Every switch or hold records: decision id, timestamp, policy version (hash), the rule that fired, a **reason code**, the selected model, the rejected alternatives with their reason codes, and the observation ids it relied on. Fallback events also record the failure class (§4.9) and **whether the fallback shared the failed dependency** — the direct test of §6.4. Manual-override records carry entry, expiry, hold flag, resume source, and whether the selector later adopted or replaced the human's choice.
+
+**Reason codes are a fixed, enumerated list** (`reserve_reached`, `free_budget_restored`, `foreign_write`, `credit_limit`, `delisted_default`, `quota_unreadable`, …), never free text. Codes are private by construction and readable in a review; free text is neither.
+
+### 30.3 Outcome records
+
+For every switch or hold, the selector later appends an outcome record linked by decision id: status (`completed`, `failed`, `timeout`, `user_override`, `unknown`), time to first answer, total duration, whether a rate limit was hit, whether a fallback was used.
+
+**Record what was observed; do not score the decision.** "Was this switch right?" is a question for the weekly review, not a number the selector computes. An automatic score would reward short-term avoidance of 429s over the work actually getting done.
+
+### 30.4 What to sample and what not to
+
+- **Per-session request draw: every session, never sampled.** The reserve is the largest observed draw (§4.13); sampling is how the largest one gets missed. One small row per session.
+- **Time to first answer: sampled**, separated by model class (chat, reasoning) and by tool-heavy versus plain turns.
+- **Spend: a daily rollup** by tier, not a per-request ledger.
+- **Limit snapshots: each tick** — cap, remaining, window type, reset instant, scope, and a hash of the limit structure, so a provider change shows up as an event (invariant 42).
+- **Capability and applicability changes: always**, even when no switch follows.
+- **Struggle signals: recorded as observations only** (invariant 44).
+
+### 30.5 Privacy (invariant 43)
+
+The ledgers hold model ids, providers, counts, durations, timestamps, status codes and classes, quota values, reason codes, and opaque session ids. They **never** hold prompts, responses, message text, tool arguments, file paths, URLs, or anything identifying a user. This is a hard rule, not a guideline: it is what makes the ledgers safe to keep and their lessons safe to share.
+
+### 30.6 Retention and sharing
+
+Raw ledgers rotate: keep `{{ledger_raw_retention_days}}` days (default 90). Weekly and monthly rollups are kept indefinitely; they are what the weekly review (§29) reads. Sharing between boxes — or with anyone — is an **explicit, opt-in lessons export**: a sanitized summary of rollups and findings, never a raw ledger.
+
+### 30.7 Every metric earns its place
+
+Each metric has a card (`docs/ledger-metrics.md`): purpose, unit, when collected, sampling, retention, privacy class, the rule it informs, the review question it answers, and when to prune it. A metric with no rule it informs and no review question does not ship. This is the guide's "name what prunes it" rule applied to telemetry.
+
+### 30.8 Descriptive first (invariant 44)
+
+At first the ledgers only **describe**. They answer: How often does the reserve bind? Do fallbacks share the failed dependency? How often are overrides made, and how long do they last? Is local latency acceptable for the work attempted? Do struggle signals predict anything?
+
+No rule uses ledger history to change its own behavior — reserve, fallback order, escalation thresholds, local eligibility, the override window — until the history meets that metric's sample floor **and** the operator enables it for that rule. Until then the selector would be optimizing noise. The single existing exception is the reserve, whose sizing rule (§4.13) is itself the validated procedure, and which stays provisional below its floor.
 
 ---
 
@@ -3205,6 +2991,7 @@ Each decision is recorded with its reason.
 | v3.2c | v3.2b | Housekeeping: LF line endings and `.gitattributes`; embedded scripts marked illustrative; private record filename removed; whole-repository GPL-3.0 stated. |
 | v3.3 | v3.2c | Rule pass: two-axis reporting (applicability vs. check result); fallback heads that do not share the failed dependency; time-boxed manual-override pause (invariant 41); limits read live (invariant 42); credit/spend-limit failure classes; round-trip-safe config writes; local-as-main as a measured conditional exception; sample-floor, per-session, heartbeat, struggle-scope, hysteresis and inequality corrections. |
 | v3.3.1 | v3.3 | Cleanup: cross-references corrected; §26.10 renumbered §26.9; placeholders use underscores; router/guardrail exclusion and zero-price-by-work-type moved into §4; registry file declared canonical; this table brought up to date. |
+| v3.4 | v3.3.1 | Tested checks in `checks/` replace nine defective inline scripts; edge cases E4–E14; observation and decision ledgers (§30, invariants 43–44). |
 
 ### Record 5 — Anomalies and open items
 
@@ -3335,7 +3122,7 @@ A `doctor` command that outputs the deployment's actual config, chains, owners, 
 
 ## §21 — Document version
 
-**Version:** 3.3.1
+**Version:** 3.4
 **Last updated:** 2026-10-15
 
 **Companion artifacts:**
@@ -3421,7 +3208,7 @@ If a deployment keeps these, the rule set stays honest. If it drops them, it pro
 
 ---
 
-**End of the guide, v3.3.1.**
+**End of the guide, v3.4.**
 
 ---
 
@@ -3447,6 +3234,8 @@ paths:
   state_dir:                   # mode-700 state directory
   alert_file:                  # alerts.json
   ledger_file:                 # append-only run ledger
+  observation_ledger_file:     # append-only observation ledger (§30)
+  decision_ledger_file:        # append-only decision ledger with outcome records (§30)
 
 config_keys:
   model_default:               # e.g. "model.default"
@@ -3506,6 +3295,12 @@ numbers:
     description: "minimum time a tier must be held before a switch away"
   config_writes_per_hour:
     description: "cap on config writes per rolling hour before the system is considered flapping"
+  catalog_min_fraction:
+    description: "a catalog smaller than this fraction of the previous run's count is treated as unreadable (§4.3)"
+    question: "e.g. 0.5; the right value depends on how much a provider's catalog normally fluctuates"
+  ledger_raw_retention_days:
+    description: "days raw observation and decision ledgers are kept before rotation; rollups are kept indefinitely"
+    question: "default 90"
   manual_override_hours:
     description: "how long a manual change pauses the selector before it re-plans"
     question: "default 4; 4–6 recommended. A hold (no expiry) is requested explicitly, not configured here"

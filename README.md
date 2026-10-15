@@ -15,7 +15,7 @@ the values are per-box.
 
 ## What this is
 
-- **A rule set.** Forty-two numbered invariants, seven failure classes (numbered 1–4 and 6–8), and the
+- **A rule set.** Forty-four numbered invariants, seven failure classes (numbered 1–4 and 6–8), and the
   procedures that enforce them.
 - **A specification, not an implementation.** The rules bind to model routing
   policy; where they bind to a specific runtime build, they say so.
@@ -41,7 +41,7 @@ the values are per-box.
    checks against your box. Every check returns PASS, FAIL, or CANNOT-OBSERVE;
    a read error is never PASS.
 
-Part II of the document is the runbook (tested scripts will live in `checks/`; not yet written). Part III is
+Part II of the document is the runbook (tested scripts live in `checks/`). Part III is
 the record — incident history, decisions, and the reference deployment findings.
 Read it or don't; the rules stand alone.
 
@@ -55,16 +55,17 @@ Read it or don't; the rules stand alone.
     docs/capability-questionnaire.md      which rules apply to your setup
     docs/doctor-design.md                 read-only discovery tool (design)
     docs/adapters/                        provider notes (dated; limits are read live)
+    docs/ledger-metrics.md                one card per recorded metric
+    checks/                               tested checks; run checks/tests/run.sh
     CHANGELOG.md                          version history
-
-A `checks/` directory of tested scripts is planned; it does not exist yet.
 
 ## Status
 
-- **Version:** 3.3.1
-- **Verified:** source-verified against the running stack. The checks embedded
-  in §10 are **illustrative, not tested scripts**; several have known defects.
-  Do not copy them onto a live box. Tested checks will ship as files.
+- **Version:** 3.4
+- **Verified:** source-verified against the running stack. The checks in
+  `checks/` are tested against fixtures (`checks/tests/run.sh`) but not yet on a
+  live Hermes box. Code blocks remaining inside the specification are
+  illustrative; do not copy them onto a live box.
 - **Open items:** named in the document's §16 (open questions) and Record 5
   (open items at publication). The specification is honest about what is not
   yet live-run-verified.
