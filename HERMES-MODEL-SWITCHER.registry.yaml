@@ -18,6 +18,7 @@ paths:
   observation_ledger_file:     # append-only observation ledger (§30)
   decision_ledger_file:        # append-only decision ledger with outcome records (§30)
   capability_profile_file:     # this box's hardware and admitted local models (§31.7)
+  writer_registry_file:        # every writer of mutable routing state, with kind and status (§3.7a)
 
 config_keys:
   model_default:               # e.g. "model.default"

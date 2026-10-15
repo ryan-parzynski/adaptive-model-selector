@@ -8,6 +8,27 @@ Version history of `HERMES-MODEL-SWITCHER.md`. The current version is in `VERSIO
 
 ---
 
+## v3.6 — 2026-10-15 — principles, writer registry, alert gate, scratch home
+
+- §0 principles restated around *discover safely, decide explicitly, implement narrowly, verify independently, preserve a working fallback*. "Keep boxes aligned by contract" is replaced by "deployment-driven, not replicated".
+- §3.7a writer registry with phased retirement; invariant 47.
+- Alert delivery is `absent`, `configured-failing`, or `verified`. Configured-failing is a routing defect: FAIL, not acknowledgeable, and it blocks enabling automated writers, escalation, or self-tuning.
+- §4.13: the reserve is a static per-box value (provisional until measured); limits are read live.
+- §6.4a: a model served by another box is self-hosted, peer-hosted — admitted and measured from the consuming box, identified by node id.
+- §8.0: per-box state vs. fleet-shared material.
+- §10.36: scratch-home isolation and the minimal safe check set when routing changes are forbidden.
+- New checks `writer-registry.py`, `scratch-preflight.sh`; fixture suite now 75 cases.
+- Agent guide: phase table; CANNOT-OBSERVE is a distinct item state; merge path writes a writer registry.
+
+**Adopters: action required**
+- Write `writers.yaml` (`writer_registry_file`) listing every component that can write routing state; run `checks/writer-registry.py`. Any `unknown` writer blocks implementation work.
+- Retire any legacy writer through the phases in §3.7a rather than deleting it.
+- Re-check the alert state. If it is `configured-failing`, do not enable automated writers, escalation, or self-tuning until a test alert succeeds.
+- If a reserve value was set by hand, label it provisional until the per-session draw ledger supports it.
+- If a routed model is served by another box: re-admit it from this box and record the host by node id.
+- Before any write-test, run `checks/scratch-preflight.sh` against the scratch home.
+- Reports: use CANNOT-OBSERVE for items that ran but could not reach their fact (previously folded into FAILED).
+
 ## v3.5 — 2026-10-15 — local capability tiers and resource guards
 
 - §31: local models are tiered (fast / capacity / specialized). Start on the fast tier; escalate only on an explicit request, an explicitly deep work type, a hard failure of the fast tier, or background work. A model's judgment of its own answer is recorded, not acted on.

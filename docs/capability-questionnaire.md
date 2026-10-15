@@ -43,6 +43,8 @@ An answer of `unknown` is legitimate. It makes the dependent rules `unknown`, an
 |---|---|---|---|---|
 | C6 | Is there an **alert destination outside the box** that a human watches? | capability | Hermes delivery config | Every "fail loud" rule |
 | C6a | Has a test message to it **succeeded end-to-end** within the verification window? | capability | Last successful delivery timestamp | Whether "loud" holds (invariant 34) |
+| C6b | **Alert state:** `absent`, `configured-failing` (configured or claimed connected, but the last delivery failed, was suppressed, or resolved no target), or `verified`? | capability | Delivery config plus the job ledger's last *successful* delivery | Configured-failing is a FAIL that cannot be acknowledged and blocks enabling automated writers (§0.6) |
+| C14 | Is there a **writer registry**, and does every writer of routing state have a kind other than `unknown`? | capability | `checks/writer-registry.py` | Implementation readiness (invariant 47) |
 | P6 | If there is no alert destination: does the operator **acknowledge running unalerted**? | policy | Declaration | Turns dozens of "not loud" failures into one recorded limitation (handoff E11) |
 
 ## Boxes

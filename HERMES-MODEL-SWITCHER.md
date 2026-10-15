@@ -1,3 +1,17 @@
+# v3.6 — principles, writer registry, alert gate, scratch home
+
+Changes in this pass:
+- **§0 principles restated** around the pattern *discover safely, decide explicitly, implement narrowly, verify independently, preserve a working fallback*; the old "keep boxes aligned by contract" principle is replaced by "deployment-driven, not replicated"
+- **§3.7a writer registry and phased retirement** (registered → quarantined → observed → retired); writer kinds `owner`, `manual-tool`, `integrated`, `advisory`, `legacy`, `unknown`; invariant 47
+- **Alert state is three-way** (`absent` / `configured-failing` / `verified`); configured-failing is a routing defect that cannot be acknowledged and gates automated writers (§0.6, invariant 34)
+- **Static reserve vs. live limits** clarified (§4.13); **peer-hosted self-hosted models** classified, admitted from the consumer, identified by node id (§6.4a)
+- **§8.0 per-box state vs. fleet-shared material**
+- **§10.36 scratch-home mode** and the minimal safe check set when routing changes are forbidden
+- `checks/writer-registry.py`, `checks/scratch-preflight.sh`; 75 fixture cases; example `writers.yaml`; registry key `writer_registry_file`
+- Agent guide: phases table; CANNOT-OBSERVE as its own item state; writer registry in the merge path
+
+---
+
 # v3.5 — local capability tiers and resource guards
 
 Changes in this pass:
@@ -108,7 +122,7 @@ Changes in this pass:
 
 # Hermes Model Switcher — Operator's Guide
 
-**Version:** 3.5
+**Version:** 3.6
 **Last updated:** 2026-10-15
 **Purpose:** How to keep one or more Hermes boxes switching models safely, audibly, and without the failure modes this guide names.
 **Audience:** Operators of Hermes boxes. Anyone maintaining model routing on a box running the Hermes stack.
@@ -141,12 +155,22 @@ Changes in this pass:
 
 The Hermes model switcher does not work the way its documentation says. This guide collects what was learned across multiple deployments, in a form that applies to any Hermes box.
 
-Four principles drive everything below:
+**The pattern:** *discover safely, decide explicitly, implement narrowly, verify independently, and preserve a working fallback.*
 
-1. **Fail loud.** A silent degradation is worse than a loud failure. "Loud" is defined in §0.6.
-2. **Never route a decision through the failure domain.** Fixes must originate outside the system they're fixing.
-3. **Classify claims.** Every statement about the system is OBSERVED, HYPOTHESIS, REPORTED, PROPOSED, or BLOCKED. Do not confuse them.
-4. **Keep boxes aligned by contract, not by hope.** Drift between "the same" boxes is the default. Alignment is a check, not an assumption.
+Principles that drive everything below:
+
+1. **Separate discovery from implementation.** Classify the box's state, record the operator's decisions, and produce a migration plan before changing live routing, scheduled jobs, config, or preferences (`AGENT-GUIDE.md`).
+2. **A claim of success is not evidence.** Completion requires fresh commands, artifacts, API responses, timestamps, and end-to-end tests (§0.6; `AGENT-GUIDE.md` §9).
+3. **No silent skips.** A required check that is skipped, shortened, timed out, or could not observe its fact is marked as such — SKIPPED, FAILED, or CANNOT-OBSERVE — never omitted and never PASS.
+4. **Fail loud, and treat broken alert delivery as a routing defect.** A channel that reports connected while deliveries fail creates false confidence. Delivery is repaired and tested before alerts count as operational (§0.6).
+5. **One owner for each piece of mutable routing state.** Every writable routing field, `{{model_default}}` above all, has exactly one owner; every other writer is advisory, paused, or explicitly integrated (§3.7, §3.7a).
+6. **Deployment-driven, not replicated.** Boxes share portable reasoning, checks, and lessons — not live routing state, provider quotas, model lists, or hardware assumptions (§8.0).
+7. **Model tiers are a portable pattern; what a box has is a per-box capability.** Fast/interactive, deep/capacity, specialized/experimental (§31).
+8. **Route by task and resources.** Fast by default; escalate to slower, larger models only for complex reasoning, long context, or explicit request. Always preserve a working fallback (§31.3, §6.4).
+9. **Guard resources.** Know VRAM, RAM, context length, concurrent models, and offload before selecting or enabling a model; never let a large model become an unintended default or exhaust the machine (§31.5).
+10. **Keep an observation and decision ledger** — incidents, evidence, rationale, decisions, outcomes — so future agents do not repeat resolved failures (§30).
+11. **Never route a decision through the failure domain.** Fixes originate outside the system they fix (§19).
+12. **Classify claims.** OBSERVED, HYPOTHESIS, REPORTED, PROPOSED, BLOCKED (§0.6).
 
 **Terminology used throughout.** Definitions in §18:
 
@@ -163,6 +187,7 @@ Four principles drive everything below:
 
 | Concern | Section |
 |---|---|
+| Principles | §0 |
 | Failure classes | §0.5 |
 | Claim discipline and "loud" | §0.6 |
 | Environment, switch mechanisms, trap doors | §1–§3 |
@@ -370,6 +395,16 @@ An aggregate report exits 1 if any applicable rule failed, otherwise 2 if any ru
 > **Loud** — delivered to a destination outside the box that a human watches, where a test message to that same destination succeeded end-to-end within the last `{{loud_verification_window}}`, and the event repeats or escalates until acknowledged.
 
 Writing to a log file is **recorded**, not loud. If the destination has not been verified within the window, every fail-loud rule is unmet and the check reports FAIL, not PASS.
+
+**Alert delivery has three states, and they are not equivalent:**
+
+| State | Meaning | Check result |
+|---|---|---|
+| `absent` | No destination is configured | FAIL — "box is unalerted"; may be acknowledged by the operator (below) |
+| `configured-failing` | A destination is configured, or a state file claims a connection, but the most recent delivery failed, was suppressed, or never resolved a target | **FAIL, and cannot be acknowledged.** This is a **routing defect**: it creates confidence the box does not have |
+| `verified` | A test message to the same destination succeeded end-to-end within `{{loud_verification_window}}` | PASS |
+
+**Gate:** no automated writer, escalation path, or self-tuning is enabled on a box until its alert state is `verified`. Discovery, ledgers, and read-only checks may proceed in any state.
 
 **Unalerted boxes report it once.** A new box often has no alert destination. Rather than every fail-loud rule failing separately, invariant 34's check reports a single FAIL — "box is unalerted" — and, if the operator has acknowledged running unalerted (questionnaire P6), names it as an acknowledged limitation. The individual fail-loud rules reference that one finding instead of repeating it. Acknowledging does not make the box loud; it makes the gap visible in one place instead of drowning the report.
 
@@ -669,6 +704,33 @@ Every entry: what it looks like, what it actually is, the fix.
 **Owner field.** The owner is recorded in `{{owner_field}}` with the active writer's name or the active writer's job id. **An empty owner field is a defect and raises an alert** — a box with an empty `{{owner_field}}` has multiple writers by default and is running unaligned. Filling the field is an operator ruling, not an agent choice.
 
 A box that runs two selectors with opposite policies (one free-first, one paid-first) will present different behavior depending on which one an agent reads. An agent reading the paused component concludes the wrong thing about the box. **Read the scheduler status before reading the policy.**
+
+### 3.7a Writer registry and phased retirement
+
+**Looks like:** the owner field names one component, so the box has one writer.
+**Reality:** merged and evolved deployments accumulate writers: a scheduled selector, a disabled-but-present autoswitcher, failover and probe-and-switch scripts, manual helpers, "check" scripts that turn out to write. The owner field constrains only the writers that read it.
+
+**Fix:** keep a **writer registry** at `{{writer_registry_file}}`. Every component that can change a piece of mutable routing state — `{{model_default}}`, `{{model_provider}}`, the fallback list, the preference file — has an entry: path, the fields it can write, its kind, its status, and the evidence for both.
+
+| Kind | Meaning | Rule |
+|---|---|---|
+| `owner` | The single writer of a field | Exactly one per field (invariant 47) |
+| `manual-tool` | Operator-invoked helper (a switch script, an override helper) | Allowed. Its writes are foreign writes to the owner and trigger the manual-override pause (§4.14a) |
+| `integrated` | Writes through the owner (calls it, or proposes a change the owner applies) | Allowed |
+| `advisory` | Reads and reports; does not write | Must be source-verified as read-only |
+| `legacy` | A former writer | Must be quarantined or retired |
+| `unknown` | Not yet classified | **Blocks implementation** until classified |
+
+**Phased retirement, never a single cutover:**
+
+1. **Registered** — the entry exists with evidence.
+2. **Quarantined** — removed from every schedule and trigger; cannot run unattended; the file is kept under version control. Reversible by re-enabling.
+3. **Observed** — through at least one full allowance reset cycle, no foreign write is attributable to it.
+4. **Retired** — moved to an archive directory; the registry entry stays, marked retired.
+
+A writer that runs **inside the request path** (a failover script invoked per request) is a hot-path writer (§27) and is classified first. An existing **manual lock** in a preference file maps onto the manual-override **hold** (§4.14a); confirm from the owner's source that it honors it before relying on it.
+
+Check: `checks/writer-registry.py`. Invariant 47.
 
 ### 3.8 Free-tier quota exhaustion looks like a stall
 
@@ -1136,6 +1198,8 @@ The free budget is spent one request per tool round. A turn with five tool calls
 
 **One line:** *a per-session reserve cannot protect a shared budget when a session's binding outlives the policy that set it.*
 
+**The reserve is static; the limits are live.** Invariant 42 requires the provider's *limits* — cap and remaining — to be read live every tick. The *reserve* is a per-box number held in the registry, and a static value is expected. What makes it trustworthy is how it was chosen: a value set by hand is **provisional** until the per-session draw ledger (§30) holds at least `{{reserve_sample_floor}}` sessions and the reserve is at or above the largest observed draw. A provisional reserve does not block adoption; an unlabelled one is a defect.
+
 **Hysteresis: leave free quickly, return slowly.** This is the canonical home of the hysteresis rule. §7.5's cooldown and rate-limit entries refer to this section; they do not define a second mechanism.
 
 - **Leave free** on one confirmed failure. The safe direction does not need hysteresis.
@@ -1487,6 +1551,9 @@ A chain entry on this box may be hosted on another box — a local model served 
 - **Record the dependency.** The consuming box's state file lists the entry and its host, and the registry list `{{cross_box_dependencies}}` names it. The host box's state file lists the consuming box. A change on the host (card maintenance, model swaps, VRAM use) shows the consumer is affected.
 - **Probe from the consumer.** A local entry hosted on another box is never assumed healthy because the host's own checks pass. The consuming box probes it.
 - **Provide a fallback not hosted on the same box.** If the peer is down, the consumer needs an independent route. The fallback for a peer-hosted local entry is not another entry on the same peer.
+- **Classify it as self-hosted, peer-hosted.** A model served by another box — typically over a tailnet — is in the local class with a network qualifier, not a separate class. Record its host by **stable node id** (§26.2), not by address.
+- **Admit and measure it from the consumer** (§31.6). Its latency includes the network path; the host's own measurements do not apply to this box.
+- **When the peer is slow, offline, or the tailnet is down:** drop the entry for that tick and fall back to an API route; never route on a last-known-good state (§26.4). Its port is access-controlled like any inference port (§26.9).
 - **Report the independence.** In the θ/independence check (§4.18 and §6.3a), a peer-hosted local entry is independent of the box's own provider but **not** independent of the peer. A failure that takes the peer offline takes the entry with it.
 - **State the dependency in the deployment's §12 record.** A reader who does not know that one box's cards serve another cannot reason about the second box's availability.
 - **A peer-hosted local entry is not an independent API route.** For the purposes of §4.9's escalation target, an independent route means a route that does not share the failed dependency. A peer-hosted local entry shares its host; if the host is the failed dependency, the entry is not independent. The escalation target remains an independent API route, or the box holds and alerts.
@@ -1618,6 +1685,22 @@ Run the verification once after a scheduled recovery, not on every tick. Its own
 
 Two boxes with "the same" config drift. The default state is drift, not parity.
 
+### 8.0 Per-box state and fleet-shared material
+
+Boxes are **independent by default**. A fleet shares reasoning and tooling; each box owns its own operational state.
+
+| Per-box — never shared | Fleet-shared — only when declared |
+|---|---|
+| Adoption record (`state/switcher-adoption.yaml`) | Specification version |
+| Writer registry and owner of each field | `checks/` code and its tests |
+| Alert destinations and their verification state | Rule cards and policy templates |
+| Provider accounts, keys, quotas, and limit observations | Registry **keys** (the questions) |
+| Model preferences, tier tables, capability profile, admitted models | Sanitized lessons (§30.6) |
+| Registry **values** (reserve, timeouts, windows) | |
+| Ledgers, reports, manual-override state | |
+
+Only properties listed in a box's shared-properties file are compared across boxes (§8.2); every other difference is expected. A cross-box *dependency* — one box's model served by another — is not shared state; it is recorded on both sides (§6.4a).
+
 **Single-box deployments.** If the deployment has one box, the pair-alignment rules in §8.1–§8.3 are not applicable. Replace the drift check with a **hash manifest of scripts and config** taken at a known-good state and compared on each run. The alignment rules do not apply; the manifest does. See §8.4.
 
 ### 8.1 What to align
@@ -1715,7 +1798,7 @@ Set by hand unless noted. Verify on both boxes. **This is the canonical invarian
 31. (R-31) **Secrets hygiene** — secrets never appear on a command line and never appear in a transcript, a log, or a screen, not even a prefix. Tests print a hash or a length.
 32. (R-32) **Verification surface** — a verification step is checked against the surface that can observe the fact it claims to test. A check that cannot read the fact is a ritual.
 33. (R-33) **Two-axis results** — every rule reports applicability (`applicable` / `not-applicable` / `unknown`) and, when applicable, a check result: PASS (0), FAIL (1), or CANNOT-OBSERVE (2). A read error or a missing input is CANNOT-OBSERVE, never PASS. `not-applicable` comes only from an absent capability or an explicit policy exclusion; `unknown` applicability is reported, never skipped (§0.6).
-34. (R-34) **"Loud" is verified delivery** — a rule that says "fail loud" is met only if delivery to a verified external destination succeeded within `{{loud_verification_window}}`. Otherwise the rule is unmet; the check reports FAIL, not PASS.
+34. (R-34) **"Loud" is verified delivery** — a rule that says "fail loud" is met only if delivery to a verified external destination succeeded within `{{loud_verification_window}}`. Otherwise the rule is unmet; the check reports FAIL, not PASS. A destination that is configured but failing is a FAIL that cannot be acknowledged, and no automated writer, escalation, or self-tuning is enabled until the alert state is `verified` (§0.6).
 35. (R-35) **Signal scope** — a struggle signal from one session cannot change the global default. Global change requires evidence from many sessions, or it is advisory (§5.8).
 36. (R-36) **Fail-closed escalation and spend guard** — The fail-closed escalation rule is in §4.9; this invariant names it, it does not restate it.
 37. (R-37) **Hysteresis** — return to free requires `{{free_return_K}}` healthy reads over `{{free_return_D}}` minutes. Every state has a minimum stay. Config writes are capped at `{{config_writes_per_hour}}` per rolling hour; hitting the cap pins the safe tier and alerts (§4.13). This is the same mechanism as §7.5's cooldown and rate-limit entries; configure them once.
@@ -1728,6 +1811,7 @@ Set by hand unless noted. Verify on both boxes. **This is the canonical invarian
 44. (R-44) **Ledgers are descriptive before they are prescriptive** — no rule tunes itself from ledger history until that metric's sample floor is met and the operator enables tuning for that rule (§30.8).
 45. (R-45) **Local resource guards** — before loading or routing to a capacity-tier local model, the selector checks free GPU memory, free RAM, loaded models, and the context needed. Without operator authorization it never enables swap, unloads or deletes a working model, downloads a model, or changes an installed model's quantization (§31.5).
 46. (R-46) **Admission before routing** — a model enters any routing path only after it has loaded, answered with content under a class-sized probe budget, and had its resource use and latency recorded in this box's capability profile. Unverified models are deferred with a reason (§31.6).
+47. (R-47) **Writer registry** — every component that can write mutable routing state is registered with the fields it writes, a kind, a status, and evidence. Each field has exactly one `owner`; every other writer is `manual-tool`, `integrated`, `advisory`, or a quarantined or retired `legacy` writer. An `unknown` writer blocks implementation (§3.7a).
 
 ---
 
@@ -2044,6 +2128,23 @@ In a scratch home: let the selector write a default; change the default by hand 
 - Static: no script hardcodes a provider's limit number (a daily request cap, a per-minute rate). Any literal is FAIL.
 - Dynamic: the last run's log shows the counter, the window type, and the reset source read from the provider on that tick. Missing → CANNOT-OBSERVE.
 
+### 10.36 Scratch-home mode — isolation before any write-test
+
+Some facts can only be observed by writing: the switch path (§10.1), scoped `/model` persistence (§10.19), fall-through on timeout (§10.28). When the operator forbids changes to live routing, these run against a **scratch home** — and only after a pre-flight proves the scratch home cannot touch live state.
+
+The scratch home must be isolated in all of these ways:
+
+- **Path:** a copy of `HERMES_HOME` at a different path; neither is inside the other; no symlink in the scratch home resolves into the live one.
+- **Files:** its own config, preference file, job file, and state directory.
+- **Scheduler:** no live scheduled job references the scratch path, and the scratch job file is never registered with a scheduler.
+- **Locks:** no shared lock files.
+- **Processes and ports:** any runtime started for the test uses the scratch home and does not bind the live gateway or dashboard ports.
+- **Providers:** calls go only to a loopback stub, unless the operator explicitly allows zero-cost reads against a real provider. A scratch copy holding real keys and real endpoints can spend real budget.
+
+Pre-flight: `checks/scratch-preflight.sh` (exit 0 isolated, 1 not isolated, 2 cannot-observe). A write-test without a passing pre-flight is not run.
+
+**The minimal safe set when routing changes are forbidden** — no writes, no spend: `no-hardcoded-ids.sh`, `env-duplicates.sh`, `no-secrets-on-argv.sh`, `writer-registry.py`, `stream-timeout.py` (reads config only), `reserve-vs-spent.sh` (when the remaining count is read from a zero-cost endpoint), plus source reads for §10.19, §10.28, and §16 Q21. `manifest.sh record` writes only to the state directory and may be allowed separately.
+
 ---
 
 ## §11 — Failure modes and expected behavior
@@ -2080,6 +2181,9 @@ The failure table is no longer duplicated here. It is the trap-door entries in *
 | Capacity-tier model short of memory | Smaller context, admitted smaller quantization, or fast tier; never swap or unload | §31.5, invariant 45 |
 | Capacity-tier model busy or too slow | Fall back to fast tier, visibly | §31.4 |
 | Model not yet verified on this box | Deferred; not routed | §31.6, invariant 46 |
+| Writer of unknown kind found | Classify before any implementation | §3.7a, invariant 47 |
+| Alert configured but deliveries fail | FAIL, not acknowledgeable; no automated writes until verified | §0.6, invariant 34 |
+| Write-test needed, live changes forbidden | Scratch home after a passing pre-flight | §10.36 |
 
 ---
 
@@ -2147,6 +2251,8 @@ Each row that records a rule's state records its **applicability** (§0.6) along
 | Hot-path discipline holds | §10.33 | yes / no / CANNOT |
 | Capability profile present and current | §31.7 | yes / no / not-applicable (no local models) |
 | Routed local models all admitted | §31.6 | yes / no — list any unadmitted |
+| Writer registry | §3.7a | present; owners per field; any `unknown`? |
+| Alert state | §0.6 | absent / configured-failing / verified |
 | Fail-closed escalation exists | §4.9 | yes / no |
 | Provider-side spend cap | §4.9 | yes / no |
 | Hysteresis values in use | §4.13 | K, D, config_writes_per_hour |
@@ -2202,6 +2308,7 @@ This is a **priority order**, not a restatement of rules. Each item names the ru
 35. **Confirm limits are read live**, with no hardcoded provider numbers. Invariant 42; §10.35.
 36. **Start the observation and decision ledgers** before tuning anything; confirm they hold no conversation content. Invariants 43, 44; §30.
 37. **If the box has local models, write its capability profile** and admit each routed model on this box. Invariants 45, 46; §31.
+38. **Register every writer** of routing state and classify it; quarantine before retiring. Invariant 47; §3.7a.
 
 ---
 
@@ -2295,6 +2402,9 @@ Most of this list is generated from invariants. The rest names a failure mode no
 - Do not enable swap, unload a working model, download a model, or change quantization without authorization (45).
 - Do not route to a model that has not been admitted on this box (46).
 - Do not apply one box's capability profile to another.
+- Do not retire a writer in one step; register, quarantine, observe, then retire (47).
+- Do not acknowledge a configured-but-failing alert path as if it were absent (34).
+- Do not run a write-test without a passing scratch pre-flight (§10.36).
 
 ---
 
@@ -2615,6 +2725,8 @@ The list below names the **patterns** the rules exist to prevent. The incident h
 | **Capacity tier** | Larger local models, often partly offloaded to RAM; slower; used only on an escalation trigger (§31.1, §31.3). |
 | **Admission** | Verifying on this box that a model loads, answers, and has its resource use recorded, before it is routed (§31.6). |
 | **Capability profile** | A box's record of its hardware and admitted local models (§31.7). |
+| **Writer registry** | The per-box list of every component that can write routing state, with its kind and status (§3.7a). |
+| **Scratch home** | An isolated copy of the Hermes home for write-tests, verified by pre-flight (§10.36). |
 | **Reason code** | A fixed, enumerated code explaining a decision; never free text (§30.2). |
 | **Manual-override pause** | The state the selector enters after a foreign write: no writes until the window expires, an explicit resume, or — for a hold — only an explicit resume (§4.14a). |
 
@@ -3114,6 +3226,7 @@ Each decision is recorded with its reason.
 | v3.4.1 | v3.4 | `AGENT-GUIDE.md` (new / merge / update paths); `VERSION` file; adoption record; stable invariant numbers; adopter actions in the changelog. |
 | v3.4.2 | v3.4.1 | Agent guide definition of done: acceptance items, fresh-evidence verification pass, COMPLETE / INCOMPLETE, second-party verification for high-stakes changes. |
 | v3.5 | v3.4.2 | Local capability tiers and resource guards (§31); invariants 45 (resource guards) and 46 (admission before routing); per-box capability profile. |
+| v3.6 | v3.5 | Principles restated; writer registry and phased retirement (invariant 47); three-state alert gate; per-box vs. fleet table; scratch-home mode; two new checks. |
 
 ### Record 5 — Anomalies and open items
 
@@ -3244,7 +3357,7 @@ A `doctor` command that outputs the deployment's actual config, chains, owners, 
 
 ## §21 — Document version
 
-**Version:** 3.5
+**Version:** 3.6
 **Last updated:** 2026-10-15
 
 **Companion artifacts:**
@@ -3330,7 +3443,7 @@ If a deployment keeps these, the rule set stays honest. If it drops them, it pro
 
 ---
 
-**End of the guide, v3.5.**
+**End of the guide, v3.6.**
 
 ---
 
@@ -3359,6 +3472,7 @@ paths:
   observation_ledger_file:     # append-only observation ledger (§30)
   decision_ledger_file:        # append-only decision ledger with outcome records (§30)
   capability_profile_file:     # this box's hardware and admitted local models (§31.7)
+  writer_registry_file:        # every writer of mutable routing state, with kind and status (§3.7a)
 
 config_keys:
   model_default:               # e.g. "model.default"

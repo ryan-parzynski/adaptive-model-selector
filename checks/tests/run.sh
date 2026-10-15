@@ -91,6 +91,47 @@ expect 1 "timeout: below range" -- st 'agent:\n  t: 30\n'
 expect 1 "timeout: absent" -- st 'agent: {}\n'
 expect 2 "timeout: config unreadable" -- st ': [\n'
 
+# ---------- writer-registry.py
+W="$T/w"; mkdir -p "$W"
+wr() { printf '%s\n' "$1" > "$W/writers.yaml"; env WRITER_REGISTRY="$W/writers.yaml" python3 "$C/writer-registry.py"; }
+expect 0 "writers: example registry" -- env WRITER_REGISTRY="$C/../docs/examples/writers.example.yaml" python3 "$C/writer-registry.py"
+expect 1 "writers: two active owners" -- wr 'writers:
+  - {name: a, path: a.py, kind: owner, status: active, fields: [model.default], evidence: x}
+  - {name: b, path: b.py, kind: owner, status: active, fields: [model.default], evidence: x}'
+expect 1 "writers: no owner of model.default" -- wr 'writers:
+  - {name: a, path: a.py, kind: manual-tool, status: active, fields: [model.default], evidence: x}'
+expect 1 "writers: unknown kind blocks" -- wr 'writers:
+  - {name: a, path: a.py, kind: owner, status: active, fields: [model.default], evidence: x}
+  - {name: f, path: failover.sh, kind: unknown, status: active, fields: [], evidence: x}'
+expect 1 "writers: active legacy" -- wr 'writers:
+  - {name: a, path: a.py, kind: owner, status: active, fields: [model.default], evidence: x}
+  - {name: l, path: l.py, kind: legacy, status: active, fields: [model.default], evidence: x}'
+expect 1 "writers: advisory that writes" -- wr 'writers:
+  - {name: a, path: a.py, kind: owner, status: active, fields: [model.default], evidence: x}
+  - {name: c, path: c.py, kind: advisory, status: active, fields: [model.default], evidence: x}'
+expect 1 "writers: missing evidence" -- wr 'writers:
+  - {name: a, path: a.py, kind: owner, status: active, fields: [model.default]}'
+expect 1 "writers: registry missing" -- env WRITER_REGISTRY="$W/none.yaml" python3 "$C/writer-registry.py"
+expect 2 "writers: path not set" -- env WRITER_REGISTRY= python3 "$C/writer-registry.py"
+
+# ---------- scratch-preflight.sh
+L="$T/live"; SC="$T/scratch"; mkdir -p "$L/cron" "$L/state" "$SC/state"
+printf 'model: {default: x}\n' > "$L/config.yaml"; echo '{"jobs": []}' > "$L/cron/jobs.json"
+printf 'model: {default: x}\nproviders: {stub: {base_url: "http://127.0.0.1:8080/v1"}}\n' > "$SC/config.yaml"
+pf() { env LIVE_HOME="$L" SCRATCH_HOME="$SC" "$@" bash "$C/scratch-preflight.sh"; }
+expect 0 "preflight: isolated scratch" -- pf
+expect 1 "preflight: scratch is live" -- env LIVE_HOME="$L" SCRATCH_HOME="$L" bash "$C/scratch-preflight.sh"
+mkdir -p "$L/inner"; cp "$SC/config.yaml" "$L/inner/"; expect 1 "preflight: scratch inside live" -- env LIVE_HOME="$L" SCRATCH_HOME="$L/inner" bash "$C/scratch-preflight.sh"
+ln -s "$L/state" "$SC/state-link"; expect 1 "preflight: symlink into live" -- pf; rm "$SC/state-link"
+ln "$L/config.yaml" "$SC/shared.yaml"; expect 1 "preflight: hard link shared with live" -- pf; rm "$SC/shared.yaml"
+echo "{\"jobs\": [{\"cmd\": \"run --home $SC\"}]}" > "$L/cron/jobs.json"; expect 1 "preflight: live job references scratch" -- pf; echo '{"jobs": []}' > "$L/cron/jobs.json"
+printf 'base_url: "https://openrouter.ai/api/v1"\n' >> "$SC/config.yaml"; expect 1 "preflight: remote provider" -- pf
+expect 0 "preflight: remote provider explicitly allowed" -- pf ALLOW_REMOTE_PROVIDERS=1
+sed -i.bak '/openrouter/d' "$SC/config.yaml"
+expect 1 "preflight: port clash" -- pf LIVE_PORTS="9119 8080" SCRATCH_PORTS="9119"
+mv "$SC/config.yaml" "$SC/c.bak"; expect 1 "preflight: scratch has no config" -- pf; mv "$SC/c.bak" "$SC/config.yaml"
+expect 2 "preflight: scratch missing" -- env LIVE_HOME="$L" SCRATCH_HOME="$T/nope" bash "$C/scratch-preflight.sh"
+
 # ---------- probe.sh (local stub server)
 if command -v jq >/dev/null && command -v curl >/dev/null; then
   PORT=$(python3 -c 'import socket; s=socket.socket(); s.bind(("127.0.0.1",0)); print(s.getsockname()[1])')

@@ -1,0 +1,26 @@
+# Writer registry — EXAMPLE (§3.7a, invariant 47). Each box keeps its own.
+writers:
+  - name: model_selector
+    path: scripts/model_selector.py
+    kind: owner
+    status: active
+    fields: [model.default, model.provider]
+    evidence: "scheduled every 10 min; last exit 0; reads policy.owner (source-verified)"
+  - name: switch-model
+    path: scripts/switch-model.sh
+    kind: manual-tool
+    status: active
+    fields: [model.default]
+    evidence: "operator-invoked only; not in any schedule"
+  - name: free_model_check
+    path: scripts/agent_free_model_check.py
+    kind: advisory
+    status: active
+    fields: []
+    evidence: "source-verified: reads catalog and quota, writes only its log"
+  - name: free_model_autoswitch
+    path: scripts/free_model_autoswitch.py
+    kind: legacy
+    status: quarantined
+    fields: [model.default]
+    evidence: "disabled in scheduler since «date»; file kept under version control"

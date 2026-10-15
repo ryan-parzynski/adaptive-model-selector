@@ -12,6 +12,24 @@ Everything else in this repository is reference material. This guide tells you w
 
 ---
 
+## The pattern
+
+**Discover safely, decide explicitly, implement narrowly, verify independently, and preserve a working fallback.**
+
+| Phase | Who | What happens | What may change on the box |
+|---|---|---|---|
+| **Discover** | Agent | Classify state, run read-only checks, inventory writers, build the capability profile | Nothing. Only report and state files, if the operator allows them |
+| **Decide** | Operator | Answer the open questions; approve or reject each proposal; record the decisions in the adoption record | The adoption record |
+| **Implement narrowly** | Operator, or the agent on an explicit, scoped task | One approved change at a time, smallest first, each with a rollback | Only what that task names |
+| **Verify independently** | Operator or a separate agent | Fresh evidence that the change did what it claimed (guide §9) | Nothing |
+| **Preserve a fallback** | Everyone | A working route exists at every step; nothing is retired before its replacement is verified | — |
+
+This guide covers **Discover** in full and sets up **Decide**. An implementation pass is a separate, operator-approved task.
+
+The specification's principles are listed in `HERMES-MODEL-SWITCHER.md` §0.
+
+---
+
 ## Paste-in prompt
 
 An operator can give this to a Hermes agent as-is:
@@ -33,7 +51,7 @@ You may:
 - create a **scratch copy** of the Hermes home and run write-tests against the copy only;
 - write your report and proposals to files the operator will read.
 
-The one check that writes config, `checks/switch-path.sh`, refuses to run unless `SWITCH_CHECK_SCRATCH=1` marks a scratch home. Never set that flag on the live home.
+The one check that writes config, `checks/switch-path.sh`, refuses to run unless `SWITCH_CHECK_SCRATCH=1` marks a scratch home. Never set that flag on the live home. Before **any** write-test, run `checks/scratch-preflight.sh` and proceed only if it exits 0 (spec §10.36). It proves the scratch home has its own files, no links into the live home, no scheduled job pointing at it, no shared ports, and no real provider endpoints.
 
 ### 1.2 Label every claim
 
@@ -119,6 +137,8 @@ The ones that most change what applies:
 
 See `checks/README.md` for each check's inputs, which map to registry keys. Run only checks whose rule is applicable. Record each result with its exit code.
 
+**If the operator forbids routing changes** (the default for a discovery pass), the minimal safe set is: `no-hardcoded-ids.sh`, `env-duplicates.sh`, `no-secrets-on-argv.sh`, `writer-registry.py` (once a registry exists), `stream-timeout.py` (reads config only), and `reserve-vs-spent.sh` when the remaining count comes from a zero-cost endpoint. Plus source reads for the runtime facts in guide §3.6. Everything else is **SKIPPED with its reason** ("live write not permitted"), never silently left out.
+
 ### 3.6 Verify the runtime facts
 
 These differ between Hermes builds, and the specification cannot know yours:
@@ -156,6 +176,7 @@ Classify each scheduled writer by its effect on the default (§3.7): **CLOBBER**
 
 | Existing thing | Specification concept | What to check |
 |---|---|---|
+| Every writer found in guide §4.1 | **Writer registry** (§3.7a, inv. 47) | Write `writers.yaml` (see `docs/examples/writers.example.yaml`): path, fields written, kind, status, evidence. Any `unknown` blocks implementation |
 | The active selector or autoswitch job | **Owner** of the default (§3.7, inv. 21) | Exactly one active writer? Owner field populated? (§10.18) |
 | Other jobs that write the model | Non-owner writers | Should be paused or refuse to write; until then they are **foreign writes** to the owner (§4.14a) |
 | Preferred-models list | Preference list (§4.10a) | The operator's ordering is authoritative: new models are appended, dropped ones reported, never deleted |
@@ -165,7 +186,7 @@ Classify each scheduled writer by its effect on the default (§3.7): **CLOBBER**
 | Local model list or tiers | Capacity tiers and admission (§31, rule card) | Is the default local model the fast tier? Is every routed model admitted? Any scripts that unload models, pull models or enable swap? |
 | Local model routing | Local-as-main (§6.3, rule card) | Is local reachable from the main path? Measured? |
 | Logs of switches | Decision ledger (§30) | What's recorded; is any conversation content in it? |
-| Alerting | "Loud" (§0.6, inv. 34) | Last *successful* delivery, not last attempt (§10.12) |
+| Alerting | "Loud" (§0.6, inv. 34) | Last *successful* delivery, not last attempt (§10.12). Report the state as `absent`, `configured-failing`, or `verified`. **Configured-failing is a routing defect**, not a cosmetic one, and it blocks enabling any automated writer |
 | Scripts directory | Versioning (inv. 26) | Under version control? (§10.21) |
 
 ### 4.3 Merge rules
@@ -180,6 +201,8 @@ Classify each scheduled writer by its effect on the default (§3.7): **CLOBBER**
 ### 4.4 Merge output
 
 Add to the report (guide §6) a **migration plan**: an ordered list of steps, each with the rule it satisfies, the risk, how to roll it back, and whether it needs an operator decision. Order by §13's priorities. Alert path and ownership come before tuning.
+
+Retire writers **in phases**, never in one step (§3.7a): registered → quarantined (removed from schedules, file kept) → observed through a full allowance reset with no foreign writes from it → retired. Classify any writer that runs inside the request path first. If a preference file has a manual lock, propose mapping it onto the spec's hold (§4.14a), and verify from the owner's source that the owner honors it.
 
 ---
 
@@ -304,7 +327,7 @@ Every path:
 | A2 | Fixture tests run **in this run**; result recorded | `checks/tests/run.sh` exit code and summary line |
 | A3 | Hermes home resolved from the runtime | The process environment or runtime source you read it from |
 | A4 | Every capability question answered `present` / `absent` / `unknown` | Evidence per answer, or the question that resolves it |
-| A5 | Every invariant (1–46) has an applicability; every applicable one has a check result or a documented manual review with evidence | The Rules table |
+| A5 | Every invariant (1–47) has an applicability; every applicable one has a check result or a documented manual review with evidence | The Rules table |
 | A6 | Every applicable check in `checks/` run in this run | Command, exit code, timestamp |
 | A7 | Each runtime fact in guide §3.6 is source-verified, live-run-verified, or `unknown` with the command that would settle it | The Runtime facts table |
 | A8 | **Live routing unchanged by the run** | SHA-256 of `config.yaml` and of the scheduler's job listing, taken at the start and the end; they must match. (If the operator changed something meanwhile, say so; that is a foreign write, not yours.) |
@@ -314,7 +337,7 @@ Merge path, additionally:
 
 | # | Item | Verified by |
 |---|---|---|
-| M1 | Every writer of the model or fallback list inventoried, with its last exit code and first log line | Inventory table |
+| M1 | Every writer of routing state inventoried in a writer registry, with its last exit code and first log line; `writer-registry.py` run on it | Inventory table |
 | M2 | Every scheduled writer classified CLOBBER / SAFETY / NEUTRAL | Inventory table |
 | M3 | Every row of the mapping table (guide §4.2) filled for this box | Mapping table |
 | M4 | Migration plan: every step has the rule it satisfies, risk, rollback, and decision flag | Migration plan |
@@ -341,16 +364,17 @@ Each item ends in one of these states:
 | State | Meaning |
 |---|---|
 | **VERIFIED** | Established from evidence produced in this final pass |
-| **FAILED** | Attempted and could not be established (the step errored), with the error |
+| **FAILED** | Attempted; the step itself errored or its tooling broke, with the error |
+| **CANNOT-OBSERVE** | Attempted; the step ran but could not reach the fact (endpoint unreachable, input missing, permission denied), with what blocked it |
 | **SKIPPED** | Not attempted, with an allowed reason: the rule is `not-applicable` (capability absent or excluded by policy), or settling it needs an operator answer or a live write you are not permitted to make |
 | **MISSING** | Not done, done with evidence from before this pass, shortened, or timed out without a retry |
 
-A step that timed out is FAILED if retried and still failing, MISSING if not retried. Either way, record the timeout and its limit.
+A step that timed out is CANNOT-OBSERVE if retried and still timing out, MISSING if not retried. Either way, record the timeout and its limit. **No silent skips:** every acceptance item appears in the Verification log with one of these five states.
 
 ### 9.4 Choosing the status
 
 - **COMPLETE** — every item is VERIFIED or SKIPPED with an allowed reason.
-- **INCOMPLETE** — anything else. List each FAILED or MISSING item first in the report, with:
+- **INCOMPLETE** — anything else. List each FAILED, CANNOT-OBSERVE or MISSING item first in the report, with:
   - **the exact missing item** (its number and name);
   - **why existing evidence is insufficient** (stale, from an earlier run, shortened, errored, ambiguous);
   - **the exact command or check that would obtain it.**

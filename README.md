@@ -13,13 +13,29 @@ rules that prevent them, and gives runnable checks that report what is true
 instead of what was assumed. It is written to be forked: the rules travel,
 the values are per-box.
 
+## The pattern
+
+**Discover safely, decide explicitly, implement narrowly, verify independently, and preserve a working fallback.**
+
+- **Separate discovery from implementation.** Classify state, record the operator's decisions, and plan the migration before touching live routing, jobs, config, or preferences.
+- **A claim of success is not evidence.** Completion needs fresh commands, artifacts, API responses, timestamps, and end-to-end tests.
+- **No silent skips.** Anything skipped, shortened, timed out, or unobservable is marked SKIPPED, FAILED, or CANNOT-OBSERVE.
+- **Broken alert delivery is a routing defect.** "Connected" with failing deliveries is false confidence; repair and test before alerts count.
+- **One owner per piece of mutable routing state.** Every other writer is advisory, paused, or integrated.
+- **Deployment-driven.** Boxes share reasoning, checks, and lessons — not routing state, quotas, model lists, or hardware assumptions.
+- **Tiers are portable; capabilities are per box.** Fast/interactive, deep/capacity, specialized/experimental.
+- **Route by task and resources; guard resources.** Fast by default, escalate deliberately, never exhaust the machine, always keep a fallback.
+- **Keep an observation and decision ledger** so future agents don't repeat resolved failures.
+
+The full list, with section references, is §0 of the specification.
+
 ## For Hermes agents
 
 **Start with [`AGENT-GUIDE.md`](AGENT-GUIDE.md).** It covers a brand-new box, merging with a box that already switches models its own way, and updating a box that adopted an earlier version. It includes a paste-in prompt for operators.
 
 ## What this is
 
-- **A rule set.** Forty-six numbered invariants, seven failure classes (numbered 1–4 and 6–8), and the
+- **A rule set.** Forty-seven numbered invariants, seven failure classes (numbered 1–4 and 6–8), and the
   procedures that enforce them.
 - **A specification, not an implementation.** The rules bind to model routing
   policy; where they bind to a specific runtime build, they say so.
@@ -62,13 +78,13 @@ Read it or don't; the rules stand alone.
     docs/doctor-design.md                 read-only discovery tool (design)
     docs/adapters/                        provider notes (dated; limits are read live)
     docs/ledger-metrics.md                one card per recorded metric
-    docs/examples/                        example capability profile (illustrative values)
+    docs/examples/                        example capability profile and writer registry
     checks/                               tested checks; run checks/tests/run.sh
     CHANGELOG.md                          version history
 
 ## Status
 
-- **Version:** 3.5 (see `VERSION`; history and adopter actions in `CHANGELOG.md`)
+- **Version:** 3.6 (see `VERSION`; history and adopter actions in `CHANGELOG.md`)
 - **Verified:** source-verified against the running stack. The checks in
   `checks/` are tested against fixtures (`checks/tests/run.sh`) but not yet on a
   live Hermes box. Code blocks remaining inside the specification are
