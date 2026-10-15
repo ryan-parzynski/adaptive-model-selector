@@ -1,3 +1,13 @@
+# v3.4.1 — agent guide and update path
+
+Changes in this pass:
+- `AGENT-GUIDE.md`: how a Hermes agent adopts this specification on a new box, merges it with an existing switching setup, or updates from an earlier version
+- `VERSION` file; per-box adoption record (`state/switcher-adoption.yaml`)
+- Invariant numbers declared stable (§9)
+- `CHANGELOG.md` entries now carry an **Adopters: action required** list
+
+---
+
 # v3.4 — tested checks, edge cases, ledgers
 
 Changes in this pass:
@@ -78,7 +88,7 @@ Changes in this pass:
 
 # Hermes Model Switcher — Operator's Guide
 
-**Version:** 3.4
+**Version:** 3.4.1
 **Last updated:** 2026-10-15
 **Purpose:** How to keep one or more Hermes boxes switching models safely, audibly, and without the failure modes this guide names.
 **Audience:** Operators of Hermes boxes. Anyone maintaining model routing on a box running the Hermes stack.
@@ -1645,7 +1655,7 @@ Recorded differences are contracts, not oversights. Unrecorded differences are f
 
 ## §9 — Config invariants
 
-Set by hand unless noted. Verify on both boxes. **This is the canonical invariant list.** The §10 checks and §11 failure modes cite invariant numbers; they do not restate them.
+Set by hand unless noted. Verify on both boxes. **This is the canonical invariant list.** The §10 checks and §11 failure modes cite invariant numbers; they do not restate them. **Invariant numbers are stable:** they are never renumbered or reused. A retired invariant keeps its number and is marked *retired*, so reports, adoption records and rule cards that cite a number stay valid across versions.
 
 **Pair-relative invariants** (invariants 2, 21 in their pair form) are not applicable on a single-box deployment; see §8.
 
@@ -2992,6 +3002,7 @@ Each decision is recorded with its reason.
 | v3.3 | v3.2c | Rule pass: two-axis reporting (applicability vs. check result); fallback heads that do not share the failed dependency; time-boxed manual-override pause (invariant 41); limits read live (invariant 42); credit/spend-limit failure classes; round-trip-safe config writes; local-as-main as a measured conditional exception; sample-floor, per-session, heartbeat, struggle-scope, hysteresis and inequality corrections. |
 | v3.3.1 | v3.3 | Cleanup: cross-references corrected; §26.10 renumbered §26.9; placeholders use underscores; router/guardrail exclusion and zero-price-by-work-type moved into §4; registry file declared canonical; this table brought up to date. |
 | v3.4 | v3.3.1 | Tested checks in `checks/` replace nine defective inline scripts; edge cases E4–E14; observation and decision ledgers (§30, invariants 43–44). |
+| v3.4.1 | v3.4 | `AGENT-GUIDE.md` (new / merge / update paths); `VERSION` file; adoption record; stable invariant numbers; adopter actions in the changelog. |
 
 ### Record 5 — Anomalies and open items
 
@@ -3122,7 +3133,7 @@ A `doctor` command that outputs the deployment's actual config, chains, owners, 
 
 ## §21 — Document version
 
-**Version:** 3.4
+**Version:** 3.4.1
 **Last updated:** 2026-10-15
 
 **Companion artifacts:**
@@ -3208,7 +3219,7 @@ If a deployment keeps these, the rule set stays honest. If it drops them, it pro
 
 ---
 
-**End of the guide, v3.4.**
+**End of the guide, v3.4.1.**
 
 ---
 

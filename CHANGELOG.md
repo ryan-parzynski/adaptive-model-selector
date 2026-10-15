@@ -1,6 +1,22 @@
 # Changelog
 
-Version history of `HERMES-MODEL-SWITCHER.md`. Each version's detailed notes are at the top of the specification; Record 4 in Part III carries the same history in table form.
+Version history of `HERMES-MODEL-SWITCHER.md`. The current version is in `VERSION`. Each version's detailed notes are at the top of the specification; Record 4 in Part III carries the same history in table form.
+
+**For adopters.** Every entry ends with **Adopters: action required**: the work a box that adopted an earlier version must do to reach this one. When updating, read every entry between your adopted version (in `state/switcher-adoption.yaml`) and the current one, and treat those lists as your work queue (`AGENT-GUIDE.md` §5). Invariant numbers never change, so references in earlier reports stay valid.
+
+**For maintainers.** Every new entry must include an *Adopters: action required* list, even if it says "none". An entry without one is incomplete.
+
+---
+
+## v3.4.1 — 2026-10-15 — agent guide and update path
+
+- `AGENT-GUIDE.md`: one guide for a Hermes agent adopting the specification on a new box, merging it with an existing switching setup, or updating from an earlier version. Includes a paste-in prompt and a report format.
+- `VERSION` file. A per-box adoption record (`state/switcher-adoption.yaml`) is defined.
+- Invariant numbers are declared stable (§9).
+
+**Adopters: action required**
+- Write `state/switcher-adoption.yaml` recording the version and commit you have adopted (`AGENT-GUIDE.md` §7.1). Without it, future updates cannot tell where to start.
+- No rule changes.
 
 ## v3.4 — 2026-10-15 — tested checks, edge cases, ledgers
 
@@ -9,13 +25,25 @@ Version history of `HERMES-MODEL-SWITCHER.md`. Each version's detailed notes are
 - Edge cases: DST/UTC scheduling, kernel-released lock, decimal prices and every price field, empty catalog, delisted default, reset-header formats, single "unalerted" finding, provider-defined answer field, owner-change privilege.
 - §30 observation and decision ledgers; invariants 43 (no conversation content) and 44 (descriptive before self-tuning); `docs/ledger-metrics.md`.
 
+**Adopters: action required**
+- Replace any copy of an inline script from §3.11, §8.2, §8.4, §10.1, §10.2, §10.10, §10.13, §10.16 or §10.27 with the tested file in `checks/`. Run `checks/tests/run.sh` first.
+- If you compare boxes: create `state/shared-properties.txt` listing what is declared shared. Without it the drift check reports cannot-observe.
+- Re-record the single-box manifest (`checks/manifest.sh record`). The fingerprint format changed.
+- New registry keys: `catalog_min_fraction`, `ledger_raw_retention_days`, `observation_ledger_file`, `decision_ledger_file`.
+- New invariants 43 and 44. Check that no existing log or ledger contains conversation content.
+- Re-check: §4.3 (empty catalog, delisted default), §4.7 (decimal prices, every price field), §4.13a (reset formats), §4.13b (DST), §4.14 step 6 (owner change).
+
 ## v3.3.1 — 2026-10-15 — cleanup
 
 - Cross-references corrected; §26.10 renumbered §26.9.
 - Placeholders renamed to underscores (`tailnet_ip`, `card_1`..`card_3`).
 - Router/guardrail exclusion (§4.4a) and "zero-price is free only for its work type" (§4.6) moved into the selection rules.
 - Embedded registry declared a copy; the `.yaml` file is canonical.
-- Record 4 and this changelog brought up to date.
+
+**Adopters: action required**
+- Rename registry keys `tailnet-ip`, `card-1`, `card-2`, `card-3` to `tailnet_ip`, `card_1`, `card_2`, `card_3`.
+- New registry key `router_exclusion_patterns`. Confirm the selector excludes routers and guardrail models (§4.4a).
+- Confirm non-text zero-price models are not in the free text ladder (§4.6).
 
 ## v3.3 — 2026-10-15 — rule pass
 
@@ -27,7 +55,15 @@ Version history of `HERMES-MODEL-SWITCHER.md`. Each version's detailed notes are
 - Config writes must preserve comments and key order.
 - Local-as-main: a default rule with a measured, conditional exception.
 - Corrections: sample floor (largest observed draw once ≥59 sessions), per-session measurement, local-inventory heartbeat, struggle-score scope, return-to-free hysteresis, aux-head inequality edge cases.
-- New docs: rule cards, capability questionnaire, two-axis reporting, `doctor` design, OpenRouter adapter notes.
+
+**Adopters: action required**
+- Re-report every rule on the two axes. Anything previously reported "PASS (N/A)" becomes `not-applicable`.
+- Add foreign-write detection and the manual-override pause; set `manual_override_hours` (invariant 41, §4.14a, check §10.34).
+- Remove every hardcoded limit number; read limits live (invariant 42, check §10.35).
+- Re-check the fallback head against §6.4: after an account-level free limit, another free model is not an eligible fallback.
+- Add the credit/spend-limit and negative-balance classes to quota-failure handling (§4.9). Don't treat every 403 as auth.
+- Confirm config writes preserve comments, or use the sanctioned switch path (§3.37).
+- Re-derive the reserve as the largest observed per-session draw once you have 59 sessions.
 
 ## v3.2c — 2026-10-15 — housekeeping
 
@@ -36,9 +72,14 @@ Version history of `HERMES-MODEL-SWITCHER.md`. Each version's detailed notes are
 - Private deployment record filename removed.
 - Whole-repository GPL-3.0 stated.
 
+**Adopters: action required**
+- If you copied any script out of the specification before this version, check it for CRLF line endings; they break bash.
+
 ## v3.2b — 2026-10-13 — patch pass
 
 See the v3.2b notes at the top of the specification.
+
+**Adopters: action required** — not recorded for this and earlier versions. Treat an adoption older than v3.2c as a fresh adoption (`AGENT-GUIDE.md` §3) rather than an update.
 
 ## Earlier
 

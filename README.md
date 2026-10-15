@@ -13,6 +13,10 @@ rules that prevent them, and gives runnable checks that report what is true
 instead of what was assumed. It is written to be forked: the rules travel,
 the values are per-box.
 
+## For Hermes agents
+
+**Start with [`AGENT-GUIDE.md`](AGENT-GUIDE.md).** It covers a brand-new box, merging with a box that already switches models its own way, and updating a box that adopted an earlier version. It includes a paste-in prompt for operators.
+
 ## What this is
 
 - **A rule set.** Forty-four numbered invariants, seven failure classes (numbered 1–4 and 6–8), and the
@@ -47,6 +51,8 @@ Read it or don't; the rules stand alone.
 
 ## Repository layout
 
+    AGENT-GUIDE.md                        start here if you are a Hermes agent
+    VERSION                               current specification version
     HERMES-MODEL-SWITCHER.md              the specification
     HERMES-MODEL-SWITCHER.registry.yaml   values the spec references
     HERMES-MODEL-SWITCHER.sha256          integrity sidecar
@@ -61,7 +67,7 @@ Read it or don't; the rules stand alone.
 
 ## Status
 
-- **Version:** 3.4
+- **Version:** 3.4.1 (see `VERSION`; history and adopter actions in `CHANGELOG.md`)
 - **Verified:** source-verified against the running stack. The checks in
   `checks/` are tested against fixtures (`checks/tests/run.sh`) but not yet on a
   live Hermes box. Code blocks remaining inside the specification are
