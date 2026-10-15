@@ -1,3 +1,11 @@
+# v3.6.1 — recurring status report
+
+Changes in this pass:
+- `docs/switcher-status-report.md`: a recurring, read-only report for any box running a switcher — components and exit codes, provider limits vs. switcher beliefs (with impossible-reading and stale-reset checks), measured spend, unit economics by model and task, reasoning-token share, local lanes from this box's view, health, anomalies, and a sanitized JSON summary for cross-box lessons
+- No rule changes
+
+---
+
 # v3.6 — principles, writer registry, alert gate, scratch home
 
 Changes in this pass:
@@ -122,7 +130,7 @@ Changes in this pass:
 
 # Hermes Model Switcher — Operator's Guide
 
-**Version:** 3.6
+**Version:** 3.6.1
 **Last updated:** 2026-10-15
 **Purpose:** How to keep one or more Hermes boxes switching models safely, audibly, and without the failure modes this guide names.
 **Audience:** Operators of Hermes boxes. Anyone maintaining model routing on a box running the Hermes stack.
@@ -3227,6 +3235,7 @@ Each decision is recorded with its reason.
 | v3.4.2 | v3.4.1 | Agent guide definition of done: acceptance items, fresh-evidence verification pass, COMPLETE / INCOMPLETE, second-party verification for high-stakes changes. |
 | v3.5 | v3.4.2 | Local capability tiers and resource guards (§31); invariants 45 (resource guards) and 46 (admission before routing); per-box capability profile. |
 | v3.6 | v3.5 | Principles restated; writer registry and phased retirement (invariant 47); three-state alert gate; per-box vs. fleet table; scratch-home mode; two new checks. |
+| v3.6.1 | v3.6 | Recurring switcher status report (`docs/switcher-status-report.md`). |
 
 ### Record 5 — Anomalies and open items
 
@@ -3357,7 +3366,7 @@ A `doctor` command that outputs the deployment's actual config, chains, owners, 
 
 ## §21 — Document version
 
-**Version:** 3.6
+**Version:** 3.6.1
 **Last updated:** 2026-10-15
 
 **Companion artifacts:**
@@ -3443,7 +3452,7 @@ If a deployment keeps these, the rule set stays honest. If it drops them, it pro
 
 ---
 
-**End of the guide, v3.6.**
+**End of the guide, v3.6.1.**
 
 ---
 

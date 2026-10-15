@@ -78,13 +78,14 @@ Read it or don't; the rules stand alone.
     docs/doctor-design.md                 read-only discovery tool (design)
     docs/adapters/                        provider notes (dated; limits are read live)
     docs/ledger-metrics.md                one card per recorded metric
+    docs/switcher-status-report.md        recurring read-only "switcher in action" report
     docs/examples/                        example capability profile and writer registry
     checks/                               tested checks; run checks/tests/run.sh
     CHANGELOG.md                          version history
 
 ## Status
 
-- **Version:** 3.6 (see `VERSION`; history and adopter actions in `CHANGELOG.md`)
+- **Version:** 3.6.1 (see `VERSION`; history and adopter actions in `CHANGELOG.md`)
 - **Verified:** source-verified against the running stack. The checks in
   `checks/` are tested against fixtures (`checks/tests/run.sh`) but not yet on a
   live Hermes box. Code blocks remaining inside the specification are

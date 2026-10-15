@@ -8,6 +8,13 @@ Version history of `HERMES-MODEL-SWITCHER.md`. The current version is in `VERSIO
 
 ---
 
+## v3.6.1 — 2026-10-15 — recurring status report
+
+- `docs/switcher-status-report.md`: a read-only "switcher in action" report for any box running a switcher, adopted or not. It puts the provider's limits next to the switcher's beliefs (flagging impossible readings like used > limit and reset instants that never advance), reconciles spend sources, breaks costs down by model and task type including reasoning-token share, shows each local lane from this box's view (online, on GPU, address vs. node id, last call, latency), and ends with a sanitized JSON summary for comparing boxes.
+
+**Adopters: action required**
+- None required. Recommended: run the status report once now and then periodically; keep the JSON summaries.
+
 ## v3.6 — 2026-10-15 — principles, writer registry, alert gate, scratch home
 
 - §0 principles restated around *discover safely, decide explicitly, implement narrowly, verify independently, preserve a working fallback*. "Keep boxes aligned by contract" is replaced by "deployment-driven, not replicated".

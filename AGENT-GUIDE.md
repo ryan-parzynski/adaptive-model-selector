@@ -256,6 +256,12 @@ No conversation content, no key material (guide §1.4).
 
 ---
 
+## 6a. Recurring status report
+
+After adoption — or before it, on any box already running a switcher — `docs/switcher-status-report.md` is the periodic, read-only "is the switcher working?" report: what each component did, the provider's limits vs. the switcher's beliefs, measured spend and unit economics, local-lane usage seen from this box, health, and anomalies. It ends with a small sanitized JSON summary that boxes can compare as lessons.
+
+---
+
 ## 7. After the operator approves
 
 ### 7.1 Record the adoption
