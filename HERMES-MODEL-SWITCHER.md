@@ -1,3 +1,13 @@
+# v3.2c — housekeeping pass from 3.2b
+
+Changes in this pass:
+- Line endings converted from CRLF to LF; `.gitattributes` enforces LF
+- Every embedded `bash` block marked illustrative and untested; document-level notice added
+- Private deployment record filename removed from Record 6 and from the v3.2b notes
+- Whole-repository GPL-3.0 licensing stated in the README
+
+---
+
 # v3.2b — patch pass from 3.2a
 
 Changes in this pass:
@@ -25,8 +35,8 @@ Changes in this pass:
 
 # Hermes Model Switcher — Operator's Guide
 
-**Version:** 3.2b
-**Last updated:** 2026-10-13
+**Version:** 3.2c
+**Last updated:** 2026-10-15
 **Purpose:** How to keep one or more Hermes boxes switching models safely, audibly, and without the failure modes this guide names.
 **Audience:** Operators of Hermes boxes. Anyone maintaining model routing on a box running the Hermes stack.
 **Scope:** Portable. Rules travel; values are per-box and live in the registry file.
@@ -35,6 +45,8 @@ Changes in this pass:
 **Authoritative file.** The canonical text of this guide is `HERMES-MODEL-SWITCHER.md`. The companion registry is `HERMES-MODEL-SWITCHER.registry.yaml`. Where a deployment has its own copy, the deployment's copy governs that deployment — but the shape of the guide is this file.
 
 **Integrity:** see `HERMES-MODEL-SWITCHER.sha256`.
+
+**Embedded scripts are illustrative.** Every code block in this document shows the shape of a check or procedure. None is a tested script; several are known to be defective. Do not copy them onto a live box. Tested implementations will ship as files in the repository.
 
 **How to use this document.**
 
@@ -381,6 +393,8 @@ Send `confirm_expensive_model: false` unless the target tier is explicitly autho
 
 The dashboard typically requires a session cookie obtained via a login endpoint. Read the password from a mode-600 file:
 
+> **Illustrative — not a tested script.** Do not copy into a live box. Known defects in the embedded scripts are listed in the review handoff; tested versions will live as files in the repository.
+
 ```bash
 umask 077
 set -a; . "{{hermes_home}}/secrets/dashboard.env"; set +a
@@ -389,6 +403,8 @@ set -a; . "{{hermes_home}}/secrets/dashboard.env"; set +a
 Never pass a password on the command line. Never hardcode it in a script.
 
 ### 2.4 Hardened example
+
+> **Illustrative — not a tested script.** Do not copy into a live box. Known defects in the embedded scripts are listed in the review handoff; tested versions will live as files in the repository.
 
 ```bash
 umask 077
@@ -433,6 +449,8 @@ Notes:
 If the deployment provides a helper (a Python script that imports the switch function and persists the result), prefer it to direct API calls. It avoids dashboard auth handling and is the path the sanctioned writers use.
 
 **The helper's wrapper does the interpreter discovery.** The `.py` file itself does not discover its interpreter; the shell wrapper that invokes it does. The wrapper probes the capability the helper needs, using the same flags the helper will run under:
+
+> **Illustrative — not a tested script.** Do not copy into a live box. Known defects in the embedded scripts are listed in the review handoff; tested versions will live as files in the repository.
 
 ```bash
 # Discover an interpreter that can import the switch function. The check
@@ -593,6 +611,8 @@ A box that runs two selectors with opposite policies (one free-first, one paid-f
 **Reality:** the probe's default client timeout may be minutes.
 **Fix:** wrap the probe in a hard ceiling, sized to the model class (§7.2). Read the HTTP status explicitly when the probe needs to distinguish outcomes:
 
+> **Illustrative — not a tested script.** Do not copy into a live box. Known defects in the embedded scripts are listed in the review handoff; tested versions will live as files in the repository.
+
 ```bash
 # -w '%{http_code}' prints the status on stdout; no -f, so 4xx/5xx
 # are distinguishable from a timeout (curl exit 28).
@@ -692,6 +712,8 @@ But `--help` only answers for CLI flags. A slash-command flag, a config value, a
 **Looks like:** the key is present.
 **Reality:** two entries. Which one wins is parser-dependent. A shell that sources the file with `set -a` typically takes the last match; many `dotenv`-style parsers take the first. A placeholder in the losing position either never applies (harmless) or 401s every provider call (fatal).
 **Fix:** determine the winner on the box, never assume. Sourcing test — **print a hash, never the key or a prefix:**
+
+> **Illustrative — not a tested script.** Do not copy into a live box. Known defects in the embedded scripts are listed in the review handoff; tested versions will live as files in the repository.
 
 ```bash
 # Source the env file and hash the key's value; the hash identifies which
@@ -1485,6 +1507,8 @@ Two boxes with "the same" config drift. The default state is drift, not parity.
 
 Run periodically. It exits with one of **three** codes: **0 = match**, **1 = drift**, **2 = cannot-observe**. It **does not** report "no drift" from a failed read, and it **does not** treat a comparison that failed on both sides as a match.
 
+> **Illustrative — not a tested script.** Do not copy into a live box. Known defects in the embedded scripts are listed in the review handoff; tested versions will live as files in the repository.
+
 ```bash
 #!/usr/bin/env bash
 # compare-boxes.sh — run from one box, compares against another.
@@ -1649,6 +1673,8 @@ Recorded differences are contracts, not oversights. Unrecorded differences are f
 
 ### 8.4 Single-box hash manifest
 
+> **Illustrative — not a tested script.** Do not copy into a live box. Known defects in the embedded scripts are listed in the review handoff; tested versions will live as files in the repository.
+
 ```bash
 #!/usr/bin/env bash
 # manifest.sh — record a known-good state; compare on each run.
@@ -1779,6 +1805,8 @@ Every check returns one of three results: **PASS** (exit 0), **FAIL** (exit 1), 
 
 ### 10.1 The switch path works
 
+> **Illustrative — not a tested script.** Do not copy into a live box. Known defects in the embedded scripts are listed in the review handoff; tested versions will live as files in the repository.
+
 ```bash
 # Run the WRAPPER, not the .py file directly. The wrapper (§2.5) does the
 # interpreter capability probe. Running the .py directly skips that step
@@ -1792,6 +1820,8 @@ echo "switch helper OK"
 A direct invocation of the `.py` file skips the interpreter check (§2.5), and it is a live config write by a component that may not be the owner (§3.7, invariant 21). Both are defects.
 
 ### 10.2 No hardcoded model ids in the selector
+
+> **Illustrative — not a tested script.** Do not copy into a live box. Known defects in the embedded scripts are listed in the review handoff; tested versions will live as files in the repository.
 
 ```bash
 if grep -rn '{{specific_vendor}}/' "{{scripts_dir}}/{{selector_script}}"; then
@@ -1828,6 +1858,8 @@ Source `.env` before any key test. A 401 from a test that did not source `.env` 
 
 The API key is not placed on the `curl` command line. Use a mode-600 config file, or stdin:
 
+> **Illustrative — not a tested script.** Do not copy into a live box. Known defects in the embedded scripts are listed in the review handoff; tested versions will live as files in the repository.
+
 ```bash
 set -a; . "{{hermes_home}}/.env"; set +a
 # curl reads the auth from stdin; nothing touches disk.
@@ -1844,6 +1876,8 @@ The key reaches `curl` without appearing in argv. `--config -` reads the config 
 
 ### 10.8 Did another writer clobber your write?
 
+> **Illustrative — not a tested script.** Do not copy into a live box. Known defects in the embedded scripts are listed in the review handoff; tested versions will live as files in the repository.
+
 ```bash
 grep 'Model switched in-place' "{{hermes_home}}/logs/agent.log" | tail -20
 grep -A2 '^model:' "{{config_path}}"
@@ -1854,6 +1888,8 @@ Compare your write timestamp to the latest switch line.
 
 ### 10.9 Are task assignees real?
 
+> **Illustrative — not a tested script.** Do not copy into a live box. Known defects in the embedded scripts are listed in the review handoff; tested versions will live as files in the repository.
+
 ```bash
 {{task_system}} assignees
 ls "{{hermes_home}}/profiles/"
@@ -1862,6 +1898,8 @@ ls "{{hermes_home}}/profiles/"
 Any `ON DISK: no` is a phantom.
 
 ### 10.10 Does `.env` have duplicates?
+
+> **Illustrative — not a tested script.** Do not copy into a live box. Known defects in the embedded scripts are listed in the review handoff; tested versions will live as files in the repository.
 
 ```bash
 grep -c "^$( printf '%s' '{{provider_key_var}}' )=" "{{hermes_home}}/.env"
@@ -1875,6 +1913,8 @@ Run the validator against a sanitized copy of the real config, plus at least one
 
 ### 10.12 Alert path check
 
+> **Illustrative — not a tested script.** Do not copy into a live box. Known defects in the embedded scripts are listed in the review handoff; tested versions will live as files in the repository.
+
 ```bash
 hermes send -l
 cat "{{hermes_home}}/channel_directory.json" 2>/dev/null
@@ -1886,6 +1926,8 @@ cat "{{hermes_home}}/gateway_state.json" 2>/dev/null | jq '.platforms'
 **Last successful delivery.** Query the cron ledger for the most recent delivery that succeeded, not just the last attempt. Record the timestamp in the deployment's §12 record. If there is no successful delivery in the retained window, the box is **not loud** (invariant 34), and every fail-loud rule is unmet.
 
 ### 10.13 Timeout sanity — fails on absence and on out-of-range
+
+> **Illustrative — not a tested script.** Do not copy into a live box. Known defects in the embedded scripts are listed in the review handoff; tested versions will live as files in the repository.
 
 ```bash
 python3 - <<'PY'
@@ -1926,6 +1968,8 @@ The key is a registry placeholder, not a hardcoded literal. A check that hardcod
 
 ### 10.14 Verify a CLI flag exists before using it
 
+> **Illustrative — not a tested script.** Do not copy into a live box. Known defects in the embedded scripts are listed in the review handoff; tested versions will live as files in the repository.
+
 ```bash
 {{command}} --help 2>&1 | grep -i {{flag}} || echo "no {{flag}} on this version"
 ```
@@ -1937,6 +1981,8 @@ This answers for CLI flags only — see §10.19 for slash-command flags.
 See §8.2. Exit codes 0 / 1 / 2. Compare the output; do not report "no drift" when the check could not read a file.
 
 ### 10.16 Reserved vs spent
+
+> **Illustrative — not a tested script.** Do not copy into a live box. Known defects in the embedded scripts are listed in the review handoff; tested versions will live as files in the repository.
 
 ```bash
 remaining=$({{read_remaining}})
@@ -1961,6 +2007,8 @@ Confirm a `verify-*.sh` exists and a one-shot schedule invokes it after the expe
 
 ### 10.18 Owner confirmed
 
+> **Illustrative — not a tested script.** Do not copy into a live box. Known defects in the embedded scripts are listed in the review handoff; tested versions will live as files in the repository.
+
 ```bash
 {{scheduler}} list | grep -iE 'selector|failover|autoswitch'
 jq -r '.{{owner_field}}' "{{prefs_path}}"
@@ -1973,6 +2021,8 @@ Exactly one entry is active. Every other writer is paused or refuses to write. *
 ### 10.19 Scoped `/model` semantics on this build
 
 The scopes are `/model` sub-command flags, not top-level CLI flags, so `--help` cannot list them. The scope table is in §2.6. Verify from the source and then from live behavior:
+
+> **Illustrative — not a tested script.** Do not copy into a live box. Known defects in the embedded scripts are listed in the review handoff; tested versions will live as files in the repository.
 
 ```bash
 # Source check — the parser owns the flags:
@@ -1990,6 +2040,8 @@ Record the result in the deployment's §12 record under "Scoped `/model` default
 
 ### 10.20 Every shelled-out tool exists
 
+> **Illustrative — not a tested script.** Do not copy into a live box. Known defects in the embedded scripts are listed in the review handoff; tested versions will live as files in the repository.
+
 ```bash
 missing=0
 for t in {{selector_tools}}; do
@@ -2003,6 +2055,8 @@ done
 A missing tool must fail the last run loudly (invariant 25). If the run log says "silent," the dependency check and the alert path are both broken.
 
 ### 10.21 Selector scripts are versioned
+
+> **Illustrative — not a tested script.** Do not copy into a live box. Known defects in the embedded scripts are listed in the review handoff; tested versions will live as files in the repository.
 
 ```bash
 git -C "{{scripts_dir}}" rev-parse --is-inside-work-tree 2>/dev/null || {
@@ -2030,6 +2084,8 @@ Compare the tier table's families against the live catalog. Log families that ar
 
 For each model in the health probe's configuration, confirm the timeout and max-tokens are sized to that model's class. A reasoning model with a fixed chat-class timeout is a defect.
 
+> **Illustrative — not a tested script.** Do not copy into a live box. Known defects in the embedded scripts are listed in the review handoff; tested versions will live as files in the repository.
+
 ```bash
 grep -n -i 'timeout\|max_tokens\|num_predict' "{{scripts_dir}}/{{health_script}}" 2>/dev/null
 ```
@@ -2049,6 +2105,8 @@ Each case logs its class, not just "failed." See §4.9, invariant 30.
 
 ### 10.27 Confirm no secret is on a command line
 
+> **Illustrative — not a tested script.** Do not copy into a live box. Known defects in the embedded scripts are listed in the review handoff; tested versions will live as files in the repository.
+
 ```bash
 # Static scan of the scripts for the shapes that leak secrets.
 # The dynamic `ps` snapshot almost never catches a curl call (it lasts <1s),
@@ -2066,6 +2124,8 @@ Zero hits. A key on `curl`'s argv is visible to any local user via `/proc`. The 
 ### 10.28 Confirm the runtime falls through on timeout
 
 Two checks, both required:
+
+> **Illustrative — not a tested script.** Do not copy into a live box. Known defects in the embedded scripts are listed in the review handoff; tested versions will live as files in the repository.
 
 ```bash
 # Source check: look for a timeout-named fallback reason.
@@ -3017,7 +3077,7 @@ Anomalies observed but whose cause was not determined, recorded so a future read
 
 ### Record 6 — Deployment findings from the review rounds
 
-Observed during the review of the running deployments. Names are anonymized to `«box-a»` and `«box-b»`; a prior private deployment record contained findings that informed these rules; it is not part of this repository.
+Observed during the review of the running deployments. Names are anonymized to `«box-a»` and `«box-b»`. A prior private deployment record contained findings that informed these rules; it is not part of this repository.
 
 **Dormant chains.** Over a multi-day window on one deployment, several auxiliary chains configured on the box never fired. Only one fired, at a low per-session rate. The aux-head question for the dormant chains is not urgent; the chains that carry traffic are the ones that matter.
 
@@ -3129,8 +3189,8 @@ A `doctor` command that outputs the deployment's actual config, chains, owners, 
 
 ## §21 — Document version
 
-**Version:** 3.2b
-**Last updated:** 2026-10-13
+**Version:** 3.2c
+**Last updated:** 2026-10-15
 
 **Companion artifacts:**
 
@@ -3215,7 +3275,7 @@ If a deployment keeps these, the rule set stays honest. If it drops them, it pro
 
 ---
 
-**End of the guide, v3.2b.**
+**End of the guide, v3.2c.**
 
 ---
 

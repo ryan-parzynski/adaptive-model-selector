@@ -15,7 +15,7 @@ the values are per-box.
 
 ## What this is
 
-- **A rule set.** Forty numbered invariants, six failure classes, and the
+- **A rule set.** Forty numbered invariants, seven failure classes (numbered 1–4 and 6–8), and the
   procedures that enforce them.
 - **A specification, not an implementation.** The rules bind to model routing
   policy; where they bind to a specific runtime build, they say so.
@@ -41,7 +41,7 @@ the values are per-box.
    checks against your box. Every check returns PASS, FAIL, or CANNOT-OBSERVE;
    a read error is never PASS.
 
-Part II of the document is the runbook (scripts live in `checks/`). Part III is
+Part II of the document is the runbook (tested scripts will live in `checks/`; not yet written). Part III is
 the record — incident history, decisions, and the reference deployment findings.
 Read it or don't; the rules stand alone.
 
@@ -50,14 +50,20 @@ Read it or don't; the rules stand alone.
     HERMES-MODEL-SWITCHER.md              the specification
     HERMES-MODEL-SWITCHER.registry.yaml   values the spec references
     HERMES-MODEL-SWITCHER.sha256          integrity sidecar
-    checks/                               runnable checks referenced from §10
+    docs/rule-cards/                      one rule per card: why, when, how to verify
+    docs/two-axis-reporting.md            applicability vs. check result
+    docs/capability-questionnaire.md      which rules apply to your setup
+    docs/doctor-design.md                 read-only discovery tool (design)
     CHANGELOG.md                          version history
+
+A `checks/` directory of tested scripts is planned; it does not exist yet.
 
 ## Status
 
-- **Version:** 3.2b
-- **Verified:** source-verified against the running stack; §10 checks are
-  runnable but must be run per deployment.
+- **Version:** 3.2c
+- **Verified:** source-verified against the running stack. The checks embedded
+  in §10 are **illustrative, not tested scripts**; several have known defects.
+  Do not copy them onto a live box. Tested checks will ship as files.
 - **Open items:** named in the document's §16 (open questions) and Record 5
   (open items at publication). The specification is honest about what is not
   yet live-run-verified.
@@ -71,7 +77,8 @@ this specification can receive.
 
 ## License
 
-GPL-3.0. See `LICENSE`.
+GPL-3.0 for the **whole repository**: the specification, rule cards, examples,
+scripts, reference implementation and documentation. See `LICENSE`.
 
 ## Relationship to earlier work
 
