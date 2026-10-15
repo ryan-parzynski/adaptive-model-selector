@@ -1,6 +1,6 @@
 # Two-axis reporting: applicability vs. check result
 
-**Status:** PROPOSED — replaces the "N/A is PASS with a note" convention in §0.6 and invariant 33.
+**Status:** ADOPTED in v3.3 — replaced the "N/A is PASS with a note" convention. The spec text now lives in §0.6, invariant 33, the §10 header, §12 and §18; the draft wording that used to be at the end of this file has been applied.
 
 ## The problem with the current convention
 
@@ -61,24 +61,6 @@ For an aggregate report (`doctor`, or a scheduled run of all checks):
 
 Failure outranks cannot-observe, because a known problem should not be masked by an unrelated gap.
 
-## Spec text to change (draft)
+## Where this lives in the spec
 
-**§0.6, replace the N/A paragraph and the "Check results" block with:**
-
-> **Applicability and check results are separate.** Each rule first resolves its applicability — `applicable`, `not-applicable`, or `unknown` — from the box's capabilities and declared policy. Only applicable rules are checked. A check returns `pass`, `fail`, or `cannot-observe`. `not-applicable` comes only from a capability detected as absent or a resource the policy explicitly excludes; it is never inferred from a check that could not run. `unknown` applicability is reported, with the question that would resolve it. See `docs/two-axis-reporting.md`.
-
-**§0.6 status-word mapping:** delete "N/A = the rule is vacuously true on this box … returns PASS with a note". Replace with "N/A = applicability `not-applicable`; not a check result."
-
-**Invariant 33, replace with:**
-
-> 33. (R-33) **Two-axis results** — every rule reports applicability (`applicable` / `not-applicable` / `unknown`) and, when applicable, a check result: `pass` (0), `fail` (1), or `cannot-observe` (2). A read error or missing input is `cannot-observe`, never `pass`. `not-applicable` comes only from an absent capability or an explicit policy exclusion. `unknown` applicability is reported, never skipped silently.
-
-**Invariant 9 and §3.16, remove** "the check reports PASS with a note that the rule does not apply". The rule reports `not-applicable` instead.
-
-**§10 header, replace the first paragraph with:**
-
-> Each check below runs only for rules that are applicable on this box (see `docs/two-axis-reporting.md`). A check returns `pass` (exit 0), `fail` (exit 1), or `cannot-observe` (exit 2). A read error, missing input, or missing tool is `cannot-observe`. Reporting `pass` when the check could not run is the failure mode this section exists to prevent.
-
-**§12 table:** add an **Applicability** column between *Source* and *Value*. Rows such as "Local tier exists … yes / no / N/A" become a capability row plus applicability on the dependent rows.
-
-**§18 glossary:** replace the *N/A* entry with *Applicability* (the three values above) and add *Capability*.
+§0.6 (definitions and aggregate exit codes), invariant 33, the §10 header, §12 (applicability recorded per row), §18 (Applicability, Capability, N/A), and §29.2 (`not-applicable` instead of `N/A` in the ledger).

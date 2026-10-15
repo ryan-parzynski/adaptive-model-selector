@@ -67,12 +67,14 @@ An answer of `unknown` is legitimate. It makes the dependent rules `unknown`, an
 
 | ID | Question | Kind | Values | Rules it gates |
 |---|---|---|---|---|
-| P1 | **Manual-override policy** — when someone changes the default model by hand, what should the selector do? | policy | `pause-until-resume` (default) · `pause-with-timeout` | Foreign-write handling (handoff E3) |
-| P1a | If `pause-with-timeout`: how long, and must the selector **announce before resuming**? | policy | duration; announcement always required | Same |
+| P1 | **Manual-override window** — when someone changes the default model by hand, how long should the selector pause before re-planning? | policy | hours; **default 4**, 4–6 recommended (`manual_override_hours`) | Foreign-write handling (§4.14a, invariant 41) |
+| P1a | A **hold** — a pause with no expiry — is requested per override (`switcher hold`), not configured. | — | — | Same |
 | P2 | Is **local** allowed for the main session at all? | policy | `never` · `when-measured-fast-enough` | Local-as-main rule card |
 | P3 | Which **work types** are routed (text only, or also image / code / reasoning)? | policy | list | Work-type routing (§4.16) |
 
-**Note on P1.** The default is `pause-until-resume`, not a timed resume. A timed resume that then writes the selector's choice is the same as overwriting the human's change, only delayed. A forgotten override is better handled by a **repeating, visible reminder** ("manual override active since …; run `switcher resume` to hand control back") than by silently reverting it. Operators who want a timeout can opt in; when it expires, the selector announces the pending change through the alert path before writing. If there is no verified alert path, the timeout never fires, and the box stays paused.
+**Note on P1.** A manual change is respected, not reverted. The selector writes nothing for the window, then logs the resume, announces it through the alert path if one is verified, and re-plans; it writes only if the current policy still picks a different model. A hold keeps the pause until `switcher resume`. (§4.14a.)
+
+**Note on C1–C3.** Limits and their structure are read from the provider every tick (§4.9a-bis, invariant 42). Never answer these from remembered numbers.
 
 ---
 

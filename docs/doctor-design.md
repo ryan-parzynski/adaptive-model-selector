@@ -16,7 +16,7 @@ Decision engine      rule cards + capabilities + policy → applicability → ch
 Hermes adapter       inspect config · report switch mechanisms and scopes · apply an approved change
 ```
 
-The decision engine never sees a provider's JSON field names or a Hermes helper's filename. The first provider adapter is `openrouter`: an implementation, not the interface. Until its fields are verified against current OpenRouter documentation, quota-dependent capabilities report `unknown`.
+The decision engine never sees a provider's JSON field names or a Hermes helper's filename. The first provider adapter is `openrouter`: an implementation, not the interface. It reports limits and their structure live every tick (invariant 42); dated notes on the fields it reads are in `docs/adapters/openrouter-notes.md`. Until a field is verified on the running account, the capability that depends on it reports `unknown`.
 
 ## Inputs
 
@@ -97,23 +97,24 @@ A scheduled run is `plan` then `apply` on the same plan file, in one invocation.
 
 ## Manual-override handling
 
-On every run, before planning:
+Specified in §4.14a and invariant 41. On every run, before planning:
 
-- If the current default differs from both `selector_last_written_model` and the plan's choice, someone else changed it. Enter `manual-override-paused` and record:
+- If the current default differs from both `selector_last_written_model` and the plan's choice, someone else changed it. Enter the pause and record:
 
 ```yaml
 manual_override:
   detected_at:
   observed_model:
   selector_last_written_model:
-  policy: pause-until-resume | pause-with-timeout
-  pause_expires_at:        # only with pause-with-timeout
+  hold: false              # true when the operator ran `switcher hold`
+  pause_expires_at:        # detected_at + manual_override_hours (default 4); empty when hold is true
   resume_source:           # manual | timeout, set on exit
 ```
 
-- While paused, the selector **never writes**. `doctor` and `plan` show the pause on every run, and the alert path repeats a reminder.
-- **Default exit is `switcher resume` only.** `pause-with-timeout` is opt-in. When it expires, the selector announces the pending change through a verified alert path before writing. With no verified alert path, the timeout does not fire.
-- After any exit, a change is written only if the current policy still selects it.
+- While paused, the selector **never writes** and never reverts the change. `doctor` and `plan` show the pause and its expiry on every run.
+- **Exit:** `switcher resume` at any time; otherwise when `pause_expires_at` passes, unless `hold` is true. On expiry the selector logs the resume, announces it through a verified alert path if one exists, and re-plans.
+- After any exit, a change is written only if the current policy still selects a different model.
+- A new foreign write during the pause restarts the window.
 
 ## Build order
 

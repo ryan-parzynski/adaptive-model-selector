@@ -1,3 +1,22 @@
+# v3.3 — rule pass from 3.2c
+
+Changes in this pass:
+- **Two-axis reporting.** Applicability (`applicable` / `not-applicable` / `unknown`) is separate from the check result (`pass` / `fail` / `cannot-observe`). Replaces "N/A is PASS with a note" in §0.6, invariants 9 and 33, §3.16, §10, §12, §18, §29.2
+- **T1** fallback head must not share the failed dependency (§6.4)
+- **T2** local-inventory heartbeat refreshed every tick; the material-change gate applies to the resolved set (§26.5, §26.6)
+- **T3** sample floor restated: reserve = largest observed per-session draw once ≥59 sessions; "rule of three" removed (§4.13, invariant 17, §18, §20.5, registry)
+- **T4** reserve measured per session, not per turn (§28.2)
+- **T5** struggle scoring acts only through a reachable session lever; otherwise advisory (§5.2)
+- **T6** return to free after reset follows §4.13 hysteresis (§6.5)
+- **T7** edge conditions of the aux-head inequality (§4.18)
+- **E1** config rewrites must preserve comments and key order (§3.37, §4.14)
+- **E2** credit and spend-limit exhaustion added to the failure-class table (§4.9, §6.3, invariant 30)
+- **E3** foreign writes enter a time-boxed manual-override pause (§3.38, §4.14a, invariant 41, §10.34)
+- **Limits are read, not remembered** — provider limits and their structure are discovered live every tick; numbers in this guide are examples (§3.39, §4.9a-bis, invariant 42, §10.35)
+- Local-as-main becomes a default with a measured, conditional exception (§6.1, §6.3, invariant 9; rule card `docs/rule-cards/local-as-main.md`)
+
+---
+
 # v3.2c — housekeeping pass from 3.2b
 
 Changes in this pass:
@@ -35,7 +54,7 @@ Changes in this pass:
 
 # Hermes Model Switcher — Operator's Guide
 
-**Version:** 3.2c
+**Version:** 3.3
 **Last updated:** 2026-10-15
 **Purpose:** How to keep one or more Hermes boxes switching models safely, audibly, and without the failure modes this guide names.
 **Audience:** Operators of Hermes boxes. Anyone maintaining model routing on a box running the Hermes stack.
@@ -270,15 +289,21 @@ If you cannot fill in the evidence column, the claim is HYPOTHESIS or REPORTED, 
 - SKIPPED = OBSERVED (already correct; not a change).
 - PENDING = PROPOSED (planned, not done).
 - DEFERRED = BLOCKED with a named reason (waiting on a dependency).
-- N/A = the rule is vacuously true on this box (e.g., a local-tier rule on a box with no local tier). **N/A is not a fourth check result; it is a claim about applicability, and the check that reports it returns PASS with a note that the rule does not apply.** See §10.
+- N/A = applicability `not-applicable` (below). **It is not a check result.**
 
-**Check results.** Every check returns one of three results:
+**Applicability and check results are separate axes.** Each rule first resolves its **applicability** from the box's capabilities and declared policy:
 
-- **PASS** — the check observed the fact and the fact was correct.
-- **FAIL** — the check observed the fact and the fact was incorrect.
-- **CANNOT-OBSERVE** — the check could not reach the fact. A read error, a missing input, or a missing tool is CANNOT-OBSERVE, never PASS.
+- **applicable** — every condition the rule depends on holds.
+- **not-applicable** — a capability the rule depends on is detected as absent, or the policy explicitly excludes it. **Never inferred because a check could not run.**
+- **unknown** — a capability or policy the rule depends on has not been determined. Reported, with the question that would resolve it; never skipped silently.
 
-N/A is a legitimate outcome of a rule's applicability, not a check result. A check that tests a rule reports PASS, FAIL, or CANNOT-OBSERVE; if the rule is N/A on the box, the check reports PASS with a note that the rule does not apply.
+Only applicable rules are checked. A **check** returns one of three results:
+
+- **PASS** (exit 0) — the check observed the fact and the fact was correct.
+- **FAIL** (exit 1) — the check observed the fact and the fact was incorrect. A resource the policy requires but that is unavailable is FAIL, not not-applicable.
+- **CANNOT-OBSERVE** (exit 2) — the check could not reach the fact. A read error, a missing input, or a missing tool is CANNOT-OBSERVE, never PASS.
+
+An aggregate report exits 1 if any applicable rule failed, otherwise 2 if any rule is CANNOT-OBSERVE or has unknown applicability, otherwise 0. The capability questions are in `docs/capability-questionnaire.md`; the full model is in `docs/two-axis-reporting.md`.
 
 **Half-implemented is not PROPOSED.** Before labelling something PROPOSED, check whether the mechanism it depends on already exists. A feature can be half-built: the runtime tracks a value but nothing surfaces it. The correct label is "partially implemented — surface proposed."
 
@@ -617,7 +642,7 @@ A box that runs two selectors with opposite policies (one free-first, one paid-f
 # -w '%{http_code}' prints the status on stdout; no -f, so 4xx/5xx
 # are distinguishable from a timeout (curl exit 28).
 # timeout gets probe_budget + 5 s; curl --max-time gets probe_budget.
-status=$(timeout "{{probe_budget_plus5}}" curl -sS -o /dev/null -w '%{http_code}' \
+status=$(timeout "$(( {{probe_budget}} + 5 ))" curl -sS -o /dev/null -w '%{http_code}' \
   --connect-timeout 5 --max-time "{{probe_budget}}" "{{probe_url}}")
 rc=$?
 case "$rc" in
@@ -667,7 +692,7 @@ echo "probe outcome=$outcome http=$status"
 
 **Looks like:** a name list.
 **Reality:** a custom provider with a local endpoint bypasses any name list.
-**Fix:** classify by endpoint. Include private address ranges, common local ports, and any tailnet address space in use. **If the box has no local tier, this check reports PASS with a note that the rule does not apply (N/A); it does not report PASS silently.**
+**Fix:** classify by endpoint. Include private address ranges, common local ports, and any tailnet address space in use. **If the box has no local tier, the rule is `not-applicable` and is reported as such — never as a silent PASS.**
 
 ### 3.17 Local providers as the main model
 
@@ -851,6 +876,24 @@ That distinction matters: the guide's claims are calibrated. One misroute is eno
 
 
 
+### 3.37 Config rewrite destroys comments
+
+**Looks like:** load the YAML, change two keys, dump it back.
+**Reality:** a naive load/dump (PyYAML and most YAML libraries) drops every comment, reorders keys, and may change quoting. An operator's hand-annotated config is mangled on the first tick.
+**Fix:** use the runtime's sanctioned switch path (§2.1) or a round-trip-preserving YAML writer, and verify on a copy that only the intended keys changed before writing the live file (§4.14 step 4). A box where neither is available has no safe direct writer; state the limitation and do not write.
+
+### 3.38 Fighting a manual change
+
+**Looks like:** the saved default differs from the selector's choice, so the selector writes its choice back.
+**Reality:** a human (dashboard, `/model --global`) or another tool changed it on purpose. The selector reverts it, the human changes it again, and the write cap eventually pins a tier nobody chose.
+**Fix:** compare the saved value with the selector's **last write**, not only with its choice. A value that matches neither is a foreign write: enter the manual-override pause (§4.14a). Invariant 41.
+
+### 3.39 Remembered limits
+
+**Looks like:** the provider's free tier allows N requests a day; put N in the script.
+**Reality:** providers change limit numbers, tiers, and window shapes. A limit depending on account state (for example, whether credits were ever bought) changes when the account does. A remembered number is right until it silently isn't.
+**Fix:** read limits and their structure from the provider each tick (§4.9a-bis). Numbers quoted anywhere in this guide are dated examples, not values. Invariant 42.
+
 ---
 
 ## §4 — Model selection design
@@ -943,12 +986,16 @@ Do not persist a free default when the budget is spent. See §4.13 for the reser
 
 | Failure | Free affected? | Paid affected? | Action |
 |---|---|---|---|
-| Auth (401/403) | yes | yes | **Do not switch.** A 401 cannot be fixed by changing models. Record, alert, hold current tier. |
+| Auth (401; a 403 only when the provider identifies it as an authorization failure) | yes | yes | **Do not switch.** A 401 cannot be fixed by changing models. Record, alert, hold current tier. A 403 that reports a spent budget or guardrail is the credit/spend-limit class below, not auth; when the adapter cannot tell which, the class is unknown and the box holds. |
 | Provider unreachable (DNS, connect, TLS, provider-wide 5xx) | yes | yes | **Do not switch.** See the note on independent routes below. If no independent route exists, hold current tier, record, alert. |
 | Quota counter unreadable (malformed body, parse error) | unknown | no | Fail closed to paid. Log the parse failure. Re-read next tick. |
 | Free-model-only fault (429 on a `:free` model, 404 on a specific free id) | yes | no | Fail closed to paid. Log the specific model and reason. |
+| Paid credit or spend limit reached (e.g. a key limit or insufficient credits) | no | yes | **Paid is not eligible.** Use free only if it is otherwise eligible (`remaining > {{reserve}}`); otherwise hold, alert, and name the limit and its reset. Do not alternate between tiers. |
+| Account balance negative (errors on every model, free included) | yes | yes | **Do not switch.** The fix is a payment, not a route. Hold, alert. |
 
 **The rule in one sentence:** *route to a tier that does not share the failed dependency; if none exists, log, hold, and alert.*
+
+**"Fail closed to paid" means paid only when paid is eligible** — configured, permitted by policy, and not itself at a credit or spend limit. The provider adapter classifies provider-specific status codes and error metadata into these classes; the rules bind to the class, not the code.
 
 **"Independent route" means an independent API route.** A second provider or a second key is an independent route. **A local entry is not an escalation target for the main session.** Local stays aux-only (§6.3, invariant 9). Where a box has no independent API route:
 
@@ -973,6 +1020,17 @@ Do not persist a free default when the budget is spent. See §4.13 for the reser
 **The free set is refreshed on every run, not only when free is about to be used.** A selector that fetches the free catalog only when routing to free carries a stale picture while the box sits on paid: the ranking, the membership, and the "what is free now" question all decay. Refresh unconditionally; apply the material-change gate (§4.14) to the *write*, not the *fetch*.
 
 **Consequence:** when the budget resets, the ranking the selector uses is current, not as-of-last-time-the-free-tier-was-reached.
+
+### 4.9a-bis — Read limits and their structure live
+
+Every limit the selector depends on is read from the provider on each tick, at zero cost where the provider allows it:
+
+- **The counter** — used, cap, and remaining for each limit that applies (free daily requests, per-minute rate, credit balance, spend budgets).
+- **The window** — fixed calendar window (and its timezone), rolling window, or lifetime.
+- **The reset** — prefer an explicit reset instant from the API, then a confirmed rate-limit header (§4.13a), then the documented window boundary, labelled as computed.
+- **The scope** — per key, per account, or per model. When the scope cannot be determined, treat a free limit as **account-level**: the cost of that assumption is an avoidable paid tick; the cost of the opposite is a fallback that fails the same way.
+
+The provider adapter returns this structure; the decision engine never sees provider field names. When the structure changes between ticks (a cap rises because the account bought credits, a window changes type), log the change. Invariant 42.
 
 ### 4.10 Free selection
 
@@ -1008,9 +1066,9 @@ The free budget is spent one request per tool round. A turn with five tool calls
 
 **Rule:** hold the default on the operator's preferred free id while `remaining > {{reserve}}`, else switch to the paid tier. Setting the reserve to 0 spends every request and accepts the mid-turn failure.
 
-**Size the reserve against the largest observed single-session draw, not the average turn.** The unit is the **session**, not the turn. A fixed reserve correct for an average turn is meaningless against one session that can consume the entire daily budget in a single run. Track per-session draw; set the reserve above the p95 of that draw.
+**Size the reserve against the largest observed single-session draw, not the average turn.** The unit is the **session**, not the turn. A fixed reserve correct for an average turn is meaningless against one session that can consume the entire daily budget in a single run. Track per-session draw; set the reserve at or above the p95 of that draw.
 
-**A p95 needs a sample size.** Below a reasonable minimum — **{{reserve_sample_floor}} sessions** is this guide's recommended floor, and **the floor is 59, not 20** — a p95 is noise with a decimal point. **Why 59.** For the largest of n samples to exceed the true p95 with 95% confidence, the required n is roughly `ln(0.05) / ln(0.95) ≈ 59`. At n = 20, the "p95" is effectively the largest value seen; it is not a p95. Until the sample reaches the floor, use a conservative fixed reserve and **label it provisional** in the log and in the deployment's §12 record. When the sample reaches the floor, the auto-tuned value replaces the provisional one and the label is dropped.
+**Use the largest observed draw once the sample is large enough.** With at least **{{reserve_sample_floor}} sessions** (recommended **59**), set the reserve to the **largest observed per-session draw**. **Why 59:** the largest of n samples is at or above the true p95 unless every sample fell below it, which happens with probability 0.95ⁿ; for n = 59 that is under 5% (`ln(0.05) / ln(0.95) ≈ 58.4`). So the sample maximum is a 95%-confidence upper bound on the p95. Do **not** compute a p95 from a few dozen points — it is noise with a decimal point. Until the sample reaches the floor, use a conservative fixed reserve and **label it provisional** in the log and in the deployment's §12 record. When the sample reaches the floor, the measured value replaces the provisional one and the label is dropped. Re-derive on a schedule; a workload change makes old samples misleading.
 
 **The reserve value is per-box; the rule travels.** A box with a 50-request daily budget and one session that can spend all 50 in a single tool loop needs a reserve sized above its p95 draw; a box whose heaviest session is 5 requests can hold a reserve of 2. The rule — *size above the p95 single-session draw* — is invariant; the number is not. **Do not write a specific number into this guide; the number lives in the registry.**
 
@@ -1093,6 +1151,8 @@ A selector that rewrites the config on every tick creates churn, hides real chan
 
 **Rule:** compute whether the chosen model differs from what is saved. Only write the config when the answer is yes.
 
+**Compare against the selector's last write, too.** The selector records every value it writes. If the saved value differs from both the last write and the current choice, another writer changed it: that is not a material change to correct, it is a foreign write. Enter the manual-override pause (§4.14a) and write nothing (§3.38).
+
 - **Material change** (chosen model differs): write the config default and the full prefs file.
 - **No material change** (chosen model is the same): skip the config write entirely. Optionally refresh the paid-fallback field if the paid ranking shifted — verify this refresh exists on your build before relying on it.
 
@@ -1105,7 +1165,7 @@ A selector that rewrites the config on every tick creates churn, hides real chan
 1. **Acquire a lock on a dedicated lock file**, not on `{{config_path}}`. Locking the config itself is wrong: the rename replaces that file, and the next writer locks a different one.
 2. **Read the current config** into memory.
 3. **Resolve the target path.** If `{{config_path}}` is a symlink or an alias to a mount point (a home directory mounted twice), rename semantics differ: `os.replace` on the symlink replaces the link, not the target, and cross-filesystem renames fail. Write the temp file **in the same directory as the resolved target**, and `os.replace` the resolved target.
-4. **Write the new config to a temp file in the same directory** (a predictable `/tmp` path is wrong for this — it may be on a different filesystem, and rename across filesystems is not atomic).
+4. **Write the new config to a temp file in the same directory** (a predictable `/tmp` path is wrong for this — it may be on a different filesystem, and rename across filesystems is not atomic). **Serialize with a round-trip-preserving writer** so comments, key order, and quoting survive; then diff the temp file against the original and abort unless only the intended keys changed (§3.37).
 5. **fsync the temp file.**
 6. **Preserve mode and owner.** Copy the existing file's mode and owner to the temp file before the rename. A rename replaces permissions and ownership with the temp file's; if the config carries inline credentials or is read by a runtime running as another user, changed mode or owner can lock the runtime out or expose the file.
 7. **`os.replace`** the temp file over the resolved target. One rename: atomic.
@@ -1117,6 +1177,19 @@ A selector that rewrites the config on every tick creates churn, hides real chan
 **Lock the write** so concurrent writers cannot corrupt the file. A lock prevents corruption; it does not prevent a logical race between two writers that both believe they own the default. That is §3.6 and §3.7's problem, solved by the single-owner rule.
 
 **Consequence:** the config log shows only real changes. Operators can trust the log.
+
+### 4.14a — Manual-override pause
+
+A foreign write (§4.14) means someone chose a model on purpose. The selector respects it for a bounded time.
+
+- **Enter the pause** on detecting a foreign write. Record: when it was detected, the observed model, the selector's last write, and when the pause expires.
+- **While paused, write nothing** and never revert the change. Every status output and every tick's log shows the pause and its expiry.
+- **Default window:** `{{manual_override_hours}}` hours — **4 by default; 4–6 recommended.** Long enough to finish a block of work on the chosen model, short enough that a forgotten change does not disable the selector for days.
+- **Hold:** when the operator asks for it (`switcher hold`, or the equivalent the deployment provides), the pause has no expiry and ends only on an explicit resume.
+- **Resume:** an explicit `switcher resume` ends the pause immediately. On expiry, the selector logs the resume, announces it through the alert path if one is verified, and re-plans. It writes only if the current policy still selects a different model; it does not restore its old choice by reflex.
+- **A new foreign write during the pause** restarts the window.
+
+Invariant 41; check §10.34.
 
 ### 4.15 Auxiliary work split
 
@@ -1193,11 +1266,11 @@ Let `L` = local latency with CDF `F_L`, `A` = API latency with mean `E[A]`, `τ`
 
     c·(1 − p(τ)) > d·θ·(E[D_local] − E[A])
 
-Equivalently: local wins when `θ < θ* = c·(1 − p(τ)) / (d·(E[D_local] − E[A]))`.
+Equivalently, when `E[D_local] > E[A]`: local wins when `θ < θ* = c·(1 − p(τ)) / (d·(E[D_local] − E[A]))`. When `E[D_local] ≤ E[A]` — local is no slower than the API on average — local wins for every θ, provided `c·(1 − p(τ)) > 0`.
 
 **Consequences:**
 
-1. **If θ = 0** — the chain is truly non-blocking — the right side vanishes and **local always wins as long as c > 0**. No reserve conditional.
+1. **If θ = 0** — the chain is truly non-blocking — the right side vanishes and **local always wins as long as c > 0 and p(τ) < 1** (a local head that always times out only adds delay). No reserve conditional.
 2. **If the runtime does not fall through on timeout** — the turn waits for the full `L`, `p` loses its meaning, and the inequality must be rewritten with `E[L]` unbounded. The API head can then win for any θ above zero.
 
 **The decisive unknown is θ.** Measure it as an overlap bound (§4.15). Where it is unknown, use the conservative default (API head).
@@ -1244,6 +1317,8 @@ score == 0 for N minutes → de-escalate -1 tier
 ```
 
 Set thresholds and windows to your workload. The above is a starting point, not a law.
+
+**These escalations act only through a lever the selector can reach.** Where the runtime exposes a session-scoped switch the selector can call, the escalation applies to the struggling session alone. Where it does not — the common case (§2.7) — the score is **advisory**: log it and surface it; change the global default only on the many-session evidence of §5.8.
 
 ### 5.3 Not a struggle signal
 
@@ -1301,15 +1376,17 @@ Every log line about a quota-exhausted state includes the recovery instant, obta
 - Reasoning tier requires reasoning-flavored signals, not just latency or a 429.
 - Manual tier requires explicit user action. Never auto-selected.
 - De-escalate one tier after a clean window. Never skip the free tier coming down (unless budget is spent).
-- **Never route the main session to a local provider.** This includes escalation under failure. The escalation target, when one exists, is an independent API route; where none exists, the box holds and alerts (§4.9).
+- **Do not route the main session to a local provider** unless the local-as-main conditions of §6.3 are met. Never as escalation under an API failure. The escalation target, when one exists, is an independent API route; where none exists, the box holds and alerts (§4.9).
 
 ### 6.2 Failover must not run on the model it protects
 
 The escalation mechanism must not itself be subject to the tier's limits. Shell script, cron, systemd timer. Never an LLM call.
 
-### 6.3 Local is never a main model
+### 6.3 Local is not a main model by default
 
-**Rule:** the main default and the fallback head must never resolve to a local endpoint. **This holds under every condition, including a total API outage and a persistent failure.** The escalation path does not route the main session to local (§4.9).
+**Rule (default):** the main default and the fallback head do not resolve to a local endpoint. **Under an API outage or a persistent failure this holds without exception.**
+
+**Conditional exception.** A local model may serve the main default or the fallback head only when all of these hold and are recorded in the §12 record: the operator's policy allows it; its measured p95 time to first answer chunk is within the operator's declared tolerance and recently measured; a stream-stale timeout is set; and either the runtime falls through on timeout (§10.28) or the user can see the session is on a local model. An unmeasured latency counts as not met. The full card is `docs/rule-cards/local-as-main.md`. The exception exists because the default was learned on hardware too slow for interactive use; it does not describe every box. The escalation path does not route the main session to local (§4.9).
 
 **Enforcement:**
 
@@ -1325,6 +1402,7 @@ The escalation mechanism must not itself be subject to the tier's limits. Shell 
 | Network down | Switch to local | Log, hold, alert |
 | Auth failure | Switch to local | Log, hold, alert |
 | Persistent fail-closed | Switch to local | Hold, alert, rely on the provider-side cap |
+| Paid credit or spend limit reached | Switch to local | Use free if otherwise eligible; else hold, alert |
 
 **Local as offline tail:** local entries are permitted after an API fallback in the chain, and only for non-blocking auxiliary work. The head of the chain is where a session lands when the primary 429s; if it 429s there too, the session must land on an API model, not a slow local one. Local entries at the tail provide offline coverage for auxiliary work only; a main session with every API tier unreachable logs, holds, and alerts. See §6.3a.
 
@@ -1349,7 +1427,7 @@ A tail entry does **not** serve:
 
 A running session whose primary 429s does not fail — the runtime arms a cooldown and swaps to the fallback chain, one-shot. The fallback chain's head is where the session lives for the rest of the day. If the head is a local model, the session grinds on a slow local card and appears to hang.
 
-**Rule:** the fallback chain's first entry after the primary must be an API model at the same tier or cheaper. Local entries go after, and only for non-blocking auxiliary work.
+**Rule:** the fallback chain's first entry after the primary must be an API model that **does not share the primary's failed dependency**. A fallback may use the same tier only if it does not share that dependency. If the failed dependency is an account-level free allowance, another free model on the same account is not an eligible fallback; use paid if it is eligible, otherwise hold and alert. When the allowance's scope is unknown, treat it as account-level (§4.9a-bis). Local entries go after, and only for non-blocking auxiliary work (or under the §6.3 exception).
 
 ### 6.4a — Cross-box local dependencies
 
@@ -1370,7 +1448,7 @@ The reserve does not change the tier ladder; it changes the trigger for the paid
 
 - `remaining > {{reserve}}` → free tier preferred.
 - `remaining ≤ {{reserve}}` → paid tier, until the reset.
-- At reset → free tier again.
+- After the reset → free tier again, once the return conditions of §4.13 (hysteresis) are met.
 
 **When the reserve is meaningless:** if a single session can consume the entire budget, the reserve cannot protect it (§4.13). The fix is not a bigger reserve — it is not parking the main lane on the shared resource, or a per-session cap.
 
@@ -1491,7 +1569,7 @@ Run the verification once after a scheduled recovery, not on every tick. Its own
 
 Two boxes with "the same" config drift. The default state is drift, not parity.
 
-**Single-box deployments.** If the deployment has one box, the pair-alignment rules in §8.1–§8.3 become vacuous. Replace the drift check with a **hash manifest of scripts and config** taken at a known-good state and compared on each run. The alignment rules do not apply; the manifest does. See §8.4.
+**Single-box deployments.** If the deployment has one box, the pair-alignment rules in §8.1–§8.3 are not applicable. Replace the drift check with a **hash manifest of scripts and config** taken at a known-good state and compared on each run. The alignment rules do not apply; the manifest does. See §8.4.
 
 ### 8.1 What to align
 
@@ -1750,7 +1828,7 @@ esac
 
 Set by hand unless noted. Verify on both boxes. **This is the canonical invariant list.** The §10 checks and §11 failure modes cite invariant numbers; they do not restate them.
 
-**Pair-relative invariants** (invariants 2, 21 in their pair form) are vacuous on a single-box deployment; see §8.
+**Pair-relative invariants** (invariants 2, 21 in their pair form) are not applicable on a single-box deployment; see §8.
 
 **R-n** tags are a starting set for publish form (option (b) — snapshot to fork).
 
@@ -1762,7 +1840,7 @@ Set by hand unless noted. Verify on both boxes. **This is the canonical invarian
 6. (R-6) No free default while budget is spent, or while `remaining ≤ {{reserve}}`.
 7. (R-7) Errors log monitored, not just the main agent log.
 8. (R-8) A state directory exists, mode 700.
-9. (R-9) Main default and fallback head never resolve to a local endpoint. (Vacuous if the box has no local tier; the check reports PASS with a note that the rule does not apply.)
+9. (R-9) Main default and fallback head do not resolve to a local endpoint, **unless** the local-as-main conditions of §6.3 are met and recorded. Not applicable if the box has no local tier.
 10. (R-10) All API tiers unreachable → log, hold, alert. Do not route the main session to local, and do not escalate the main session to a local entry (§4.9).
 11. (R-11) Auxiliary failures never mutate the main default.
 12. (R-12) Streaming stale timeout (`{{stream_stale_timeout}}`) is set explicitly and within the working range. **Absence and out-of-range both fail the check.**
@@ -1770,7 +1848,7 @@ Set by hand unless noted. Verify on both boxes. **This is the canonical invarian
 14. (R-14) Every switch report lists stuck sessions.
 15. (R-15) Detection assumes a working alert channel. "Working" means verified-loud per §0.6.
 16. (R-16) Candidate validation requires a candidate file. Writers that cannot produce one are not protected.
-17. (R-17) Free-tier reserve (`{{reserve}}`) is set and sized above the p95 single-session draw, with a minimum sample count (`{{reserve_sample_floor}}`, **recommended 59**) before the p95 is trusted. Below the minimum, a conservative fixed reserve is used and labelled provisional.
+17. (R-17) Free-tier reserve (`{{reserve}}`) is set at or above the p95 single-session draw. With at least `{{reserve_sample_floor}}` sessions (**recommended 59**), the reserve is the largest observed per-session draw. Below the floor, a conservative fixed reserve is used and labelled provisional.
 18. (R-18) Selector writes only on material change, and writes both keys as one atomic pair (stage, then rename) (except a stated-limitation writer, inv. 13).
 19. (R-19) Chat filter uses the output modality field exactly, for the default text ladder.
 20. (R-20) Recovery-instant logging is present on exhausted runs, read from the confirmed daily reset (per §4.13a), or from the computed fallback labeled as such.
@@ -1783,10 +1861,10 @@ Set by hand unless noted. Verify on both boxes. **This is the canonical invarian
 27. (R-27) The tier table is checked against the live catalog on every run; drift is logged and a review is triggered.
 28. (R-28) **Schedule vs. reset** — the first selector run that reads the counter at or after `R + {{skew_margin}}` happens by `R + {{max_post_reset_delay}}`, where `R` is the confirmed daily reset. (Not a divisibility test; see §4.13b.)
 29. (R-29) **Probe budget** — timeout and max-tokens are sized per model class, not fixed. A probe that times out with no output is a probe verdict until a larger budget disproves it.
-30. (R-30) **Quota-read failure policy** — route by failure class (§4.9): auth/provider-unreachable → do not switch (log, hold, alert); quota-unreadable/free-only fault → fail closed to paid. Log the class, not just "failed."
+30. (R-30) **Quota-read failure policy** — route by failure class (§4.9): auth/provider-unreachable/negative balance → do not switch (log, hold, alert); quota-unreadable/free-only fault → fail closed to paid **only if paid is eligible**; paid credit or spend limit reached → paid is not eligible (use free if it is otherwise eligible, else hold and alert). Log the class, not just "failed."
 31. (R-31) **Secrets hygiene** — secrets never appear on a command line and never appear in a transcript, a log, or a screen, not even a prefix. Tests print a hash or a length.
 32. (R-32) **Verification surface** — a verification step is checked against the surface that can observe the fact it claims to test. A check that cannot read the fact is a ritual.
-33. (R-33) **Three-result checks** — every check returns PASS (0), FAIL (1), or CANNOT-OBSERVE (2). A read error or a missing input is CANNOT-OBSERVE, not PASS. N/A is a legitimate claim about a rule's applicability and is reported as PASS with a note that the rule does not apply.
+33. (R-33) **Two-axis results** — every rule reports applicability (`applicable` / `not-applicable` / `unknown`) and, when applicable, a check result: PASS (0), FAIL (1), or CANNOT-OBSERVE (2). A read error or a missing input is CANNOT-OBSERVE, never PASS. `not-applicable` comes only from an absent capability or an explicit policy exclusion; `unknown` applicability is reported, never skipped (§0.6).
 34. (R-34) **"Loud" is verified delivery** — a rule that says "fail loud" is met only if delivery to a verified external destination succeeded within `{{loud_verification_window}}`. Otherwise the rule is unmet; the check reports FAIL, not PASS.
 35. (R-35) **Signal scope** — a struggle signal from one session cannot change the global default. Global change requires evidence from many sessions, or it is advisory (§5.8).
 36. (R-36) **Fail-closed escalation and spend guard** — The fail-closed escalation rule is in §4.9; this invariant names it, it does not restate it.
@@ -1794,12 +1872,14 @@ Set by hand unless noted. Verify on both boxes. **This is the canonical invarian
 38. (R-38) **Cross-box dependency** — a chain entry hosted on another box is recorded, probed from the consumer, backed by an independent fallback, and listed on both boxes' state records (§6.4a). A peer-hosted local entry is not an independent API route for §4.9.
 39. (R-39) **Owner field is populated** — every artifact that has a single-writer rule has a named owner. **The artifacts with a single-writer rule are:** `{{model_default}}` (invariant 21), the local-inventory state file (§26.1), the alert-heartbeat file (§29.1), the run ledger (§29.1), the decision record (per deployment §12), the write lock (§4.14), and the config-write path (§4.14). Each names its owner. (The empty-owner rule lives in invariant 21; it is not restated here.)
 40. (R-40) **Local inference ports have explicit access control (§26.10)** — ports bind to loopback or the tailnet interface only, have a tailnet ACL allowing only named devices, and require authentication on web UIs. A check that cannot observe the refusal reports CANNOT-OBSERVE.
+41. (R-41) **Foreign writes pause the selector** — if the saved default differs from both the selector's last write and its current choice, another writer changed it. The selector enters the manual-override pause (§4.14a), writes nothing, and never reverts the change. The pause ends after `{{manual_override_hours}}` hours (default 4), immediately on an explicit resume, or — when the operator asked for a hold — only on an explicit resume.
+42. (R-42) **Limits are read, not remembered** — the free allowance, credit and spend limits, and their structure (counter, window type, reset instant) are read from the provider on every tick through the provider adapter. No script hardcodes a provider's limit numbers. A limit that cannot be read makes dependent checks CANNOT-OBSERVE.
 
 ---
 
 ## §10 — Verification checklist
 
-Every check returns one of three results: **PASS** (exit 0), **FAIL** (exit 1), or **CANNOT-OBSERVE** (exit 2). A read error, a missing input, or a missing tool is CANNOT-OBSERVE. **Reporting PASS when the check could not run is the failure mode the whole section exists to prevent.**
+Each check runs only for rules that are **applicable** on this box (§0.6). Rules that are not-applicable are reported as such and not checked; rules with unknown applicability are reported with the question that would resolve them. A check returns **PASS** (exit 0), **FAIL** (exit 1), or **CANNOT-OBSERVE** (exit 2). A read error, a missing input, or a missing tool is CANNOT-OBSERVE. **Reporting PASS when the check could not run is the failure mode the whole section exists to prevent.**
 
 **Run these checks on a schedule, not on every edit.** They are the box's self-report.
 
@@ -2171,6 +2251,20 @@ See §29. The ledger exists, has one line per tick, and the last line's timestam
 
 See §27. The prompt path makes no network calls, no probe calls, and no config writes. Where the box owns its own prompt path, run the blocked-network test (§27.3) and the import-boundary lint (§27.3). Where the prompt path is runtime code the box does not own, run the black-box test (§27.6): block the quota endpoint and stop the selector; confirm prompts still succeed within normal latency.
 
+### 10.34 Confirm the selector stands down on a foreign write
+
+In a scratch home: let the selector write a default; change the default by hand to a different model; run the selector.
+
+- PASS: it reports the manual-override pause with an expiry, writes nothing, and on a second run still writes nothing.
+- FAIL: it writes its own choice back, or reports no pause.
+- With a hold requested: PASS only if the pause has no expiry.
+- If the selector does not record its last write, the check is CANNOT-OBSERVE.
+
+### 10.35 Confirm limits are read live
+
+- Static: no script hardcodes a provider's limit number (a daily request cap, a per-minute rate). Any literal is FAIL.
+- Dynamic: the last run's log shows the counter, the window type, and the reset source read from the provider on that tick. Missing → CANNOT-OBSERVE.
+
 ---
 
 ## §11 — Failure modes and expected behavior
@@ -2198,12 +2292,20 @@ The failure table is no longer duplicated here. It is the trap-door entries in *
 | Inference port open to the tailnet | Add ACL, bind loopback/tailnet only | §3.34, §26.10 |
 | Empty alert channel and no provider-side cap | State unprotected in §12 | §4.9, invariant 36 |
 | Hot-path I/O creep | Run the blocked-network test and the lint | §27.3, §27.7 |
+| Rule's capability absent | Report not-applicable; do not run the check | §0.6, invariant 33 |
+| Rule's capability unknown | Report unknown with the question that resolves it | §0.6, invariant 33 |
+| Paid credit or spend limit reached | Paid ineligible; free if eligible, else hold and alert | §4.9, invariant 30 |
+| Default changed by someone else | Manual-override pause; write nothing | §4.14a, invariant 41 |
+| Provider changed its limits | Read live; log the structure change | §4.9a-bis, invariant 42 |
+| Config rewrite would drop comments | Round-trip writer or sanctioned path; else do not write | §3.37, §4.14 |
 
 ---
 
 ## §12 — Verification state (per-box record)
 
 Maintain this as a table per deployment. **Generated from the §10 checks where possible; the check's result is the value.** Values are per-box; the *shape* is portable.
+
+Each row that records a rule's state records its **applicability** (§0.6) alongside the value. A not-applicable row names the absent capability or the policy that excludes it.
 
 | Item | Source (§10 check) | Value |
 |---|---|---|
@@ -2253,7 +2355,7 @@ Maintain this as a table per deployment. **Generated from the §10 checks where 
 | Running selector under VCS | §10.21 | yes / no |
 | Tier-table drift check | §10.24 | present / absent |
 | Falls through on timeout | §10.28 | yes / no / source-verified |
-| Local tier exists | §3.16 | yes / no / N/A |
+| Local tier exists (capability) | §3.16 | present / absent / unknown |
 | Local tier is host-local or peer-hosted | §6.4a | host-local / peer-hosted (host: «name») |
 | Cross-box dependencies | §6.4a | list |
 | Tailnet inference-port access control | §10.30 | ACL on? bind loopback/tailnet only? auth on UIs? |
@@ -2265,6 +2367,10 @@ Maintain this as a table per deployment. **Generated from the §10 checks where 
 | Provider-side spend cap | §4.9 | yes / no |
 | Hysteresis values in use | §4.13 | K, D, config_writes_per_hour |
 | Signal-scope lever reachable | §5.8 | yes / no / advisory |
+| Manual-override state | §10.34 | none / paused until «ts» / held until resume |
+| Manual-override window | §4.14a | «hours» (default 4) |
+| Limits source | §10.35 | read live from «endpoint» / not observable |
+| Limit structure | §4.9a-bis | counter + window («daily UTC» / rolling / …) + reset source |
 
 **Generated where possible.** Where a §10 check exists for a row, the check's output is the value. Where no check exists, the operator fills the row by hand. A row left as `«…»` after a run is a check that did not run — report it as CANNOT-OBSERVE, not omit it.
 
@@ -2307,6 +2413,9 @@ This is a **priority order**, not a restatement of rules. Each item names the ru
 30. **Confirm the local-inventory state file** is fresh and well-formed. §26; §10.31.
 31. **Confirm the run ledger is being written.** §29; §10.32.
 32. **Confirm the hot-path discipline holds.** §27; §10.33.
+33. **Answer the capability questions** so each rule's applicability is known, not guessed. `docs/capability-questionnaire.md`; §0.6.
+34. **Confirm the selector stands down on a manual change** and that its pause window is set. Invariant 41; §10.34.
+35. **Confirm limits are read live**, with no hardcoded provider numbers. Invariant 42; §10.35.
 
 ---
 
@@ -2320,7 +2429,7 @@ Most of this list is generated from invariants. The rest names a failure mode no
 - Do not write the config without a material change (18).
 - Do not write the two config keys sequentially (18).
 - Do not claim atomicity a writer cannot deliver (13).
-- Do not route the main session to a local endpoint (9, 10).
+- Do not route the main session to a local endpoint outside the §6.3 exception, and never under an API failure (9, 10).
 - Do not head a blocking auxiliary chain at a local entry (3).
 - Do not head an unknown-status chain at a local entry (3).
 - Do not persist a free default while `remaining ≤ {{reserve}}` (6).
@@ -2387,6 +2496,11 @@ Most of this list is generated from invariants. The rest names a failure mode no
 - Do not size a reserve against an average turn.
 - Do not leave the local inference ports open to the tailnet.
 - Do not leave an artifact with a single-writer rule without a named owner.
+- Do not mark a rule not-applicable because its check could not run.
+- Do not revert a manual model change; pause instead (41).
+- Do not hardcode a provider's limit numbers (42).
+- Do not rewrite a hand-edited config with a writer that drops comments.
+- Do not fall back to a model that shares the failed dependency.
 
 ---
 
@@ -2498,6 +2612,8 @@ Fill in per deployment. Each is a fact or a choice a deployment must supply.
 44. What is the "loud" verification window? (§0.6.)
 45. What are the probe per-hour cap and idle window? (§7.2.)
 46. What are the alert and ledger staleness multipliers? (§29.5.)
+47. How long should a manual override pause the selector — the default 4 hours, or another value in the 4–6 hour range? (§4.14a.)
+48. Which limits does the provider expose, and what is their structure — counter, window type, reset source, scope? (§4.9a-bis.)
 
 **Checking these answers.** Each question maps to a §10 check or a §12 record row. A question with no answer after a §10 run is a CANNOT-OBSERVE for that row — not an omission.
 
@@ -2631,7 +2747,9 @@ The list below names the **patterns** the rules exist to prevent. The incident h
 | **Source-verified** | Code path confirmed by reading source. Not run. |
 | **Live-run-verified** | Command has been executed and the outcome observed. |
 | **CANNOT-OBSERVE** | A check result: the check ran but could not reach the fact. Distinct from PASS and FAIL. |
-| **N/A** | A rule's applicability on this box. Not a check result; the check reports PASS with a note. |
+| **Applicability** | Whether a rule binds on this box: `applicable`, `not-applicable` (capability absent or policy excludes it), or `unknown`. Separate from the check result (§0.6). |
+| **Capability** | A fact about the box a rule depends on (free tier, paid tier, local models, alert destination, …): `present`, `absent`, or `unknown`. |
+| **N/A** | Shorthand for applicability `not-applicable`. Not a check result. |
 | **Candidate validation** | Checking the file a writer intends to save. Requires writer support. |
 | **TTFB** | Time to first byte. |
 | **p50 / p95** | Percentiles of a rolling window. |
@@ -2659,7 +2777,7 @@ The list below names the **patterns** the rules exist to prevent. The incident h
 | **SAFETY job** | A job that moves the default toward free or cheap. |
 | **Reserve** | Free requests held back from the daily budget to avoid a mid-turn 429. Sized per-session, not per-turn. |
 | **Provisional reserve** | A reserve computed from fewer than the minimum sample of sessions. |
-| **Sample floor** | The minimum number of sessions before a p95 is trusted. Recommended **59**, derived from the rule of three (for the largest of n samples to exceed the true p95 with 95% confidence, n ≈ 59). |
+| **Sample floor** | The minimum number of sessions before the reserve is measured rather than provisional. Recommended **59**: at that size the largest observed draw is at or above the true p95 with 95% confidence (0.95⁵⁹ < 0.05). Not the rule of three, which is a different bound. |
 | **Shadow price** | The extra cost of a paid tick taken near the reserve, when it draws down the buffer that protects the main session (§4.13). |
 | **Material change** | The chosen model differs from what is saved. Gate for config write. |
 | **Atomic pair** | Writing two config keys as one staged file, renamed once, under the lock. |
@@ -2693,6 +2811,8 @@ The list below names the **patterns** the rules exist to prevent. The incident h
 | **Rule tier** | One of Cheap / Medium / Expensive, classifying when a rule may consult (§28.3). |
 | **Run ledger** | An append-only JSONL file with one record per selector run, for the weekly review (§29). |
 | **Heartbeat** | The current-state file, overwritten each run (`alerts.json`) (§29.1). |
+| **Foreign write** | A change to the saved default that matches neither the selector's last write nor its current choice (§4.14). |
+| **Manual-override pause** | The state the selector enters after a foreign write: no writes until the window expires, an explicit resume, or — for a hold — only an explicit resume (§4.14a). |
 
 ---
 
@@ -2766,11 +2886,11 @@ Four guards, stacked:
 - **Sample count** — how many probes the hysteresis window needs.
 - **Minimum dwell** — a newly admitted peer stays out of batch work until it has been up for a set period.
 
-Write the state file only on material change (invariant 18). Specific numbers are per-box values.
+Rewrite the state file every tick (stage-and-rename) so its heartbeat stays fresh; change the **resolved set** only on a material change that has passed the stability guards. The material-change gate (invariant 18) governs the resolved set and the config, not the heartbeat. Specific numbers are per-box values (`{{local_inventory_cooldown}}`, `{{local_inventory_hysteresis_up}}`, `{{local_inventory_hysteresis_down}}`, `{{local_inventory_dwell}}`).
 
 ### 26.6 State-file schema
 
-The file is the contract between reconciler and ladder. It carries a version field, a heartbeat timestamp, the resolved set, observed attributes, and a schema check at read time that fails loud if the version or a required key is missing. The ladder does not proceed with a malformed file. Same shape as the alerts heartbeat (§29.5).
+The file is the contract between reconciler and ladder. It carries a version field, a heartbeat timestamp, the resolved set, observed attributes, and a schema check at read time that fails loud if the version or a required key is missing. The ladder does not proceed with a malformed file. A stale heartbeat means the reconciler is not running: the ladder treats the resolved set as unknown and uses no local entries. Same shape as the alerts heartbeat (§29.5).
 
 ### 26.7 Operator curation
 
@@ -2883,7 +3003,7 @@ Category (c) items are resolved by choice, not by math. Pick one, apply to both 
 
 ### 28.2 Objective functions and required inputs
 
-**Free-tier reserve.** Objective: minimize P(main-session starvation) + λ·E(aux paid spend), or equivalently keep P(remaining < main-session demand over the recovery window) ≤ ε. Inputs: main-session draw distribution, aux draw rate, quota reset schedule. Measure: per-turn draws, reset timing. λ and ε are judgment inputs.
+**Free-tier reserve.** Objective: minimize P(main-session starvation) + λ·E(aux paid spend), or equivalently keep P(remaining < main-session demand over the recovery window) ≤ ε. Inputs: main-session draw distribution, aux draw rate, quota reset schedule. Measure: per-session draws (not per-turn; §4.13), reset timing. λ and ε are judgment inputs.
 
 **Stability guards.** Objective: minimize flap rate + λ·time-to-detect a real change over N, M, sample count, cooldown, dwell. Inputs: each peer's probe success/failure process, its autocorrelation, the probe interval. Measure: probe history per peer. The Pareto front runs between flap rate and detection delay.
 
@@ -2927,7 +3047,7 @@ Both written in the same run, with the same stage-and-rename or append disciplin
 - **Minimum free-budget headroom over the window** — the lowest `remaining − reserve`. Shows whether the reserve is holding.
 - **Paid aux ticks per day** — count of paid calls from non-blocking chains. *(Depends on the cron ledger or state DB recording per-call provider and tier; if not, the field is not populated.)*
 - **Tick duration and overlap count** — time per run, any run starting while another was active.
-- **Local resolved count against allowlist size** — how many allowlisted cards resolved. A falling count shows a tailnet or peer problem before any user sees it. **When the box has no local tier, the field reads `N/A`, not `0/0`.**
+- **Local resolved count against allowlist size** — how many allowlisted cards resolved. A falling count shows a tailnet or peer problem before any user sees it. **When the box has no local tier, the field reads `not-applicable`, not `0/0`.**
 - **Last successful alert delivery timestamp** — most direct check on whether alerts reach the operator.
 
 ### 29.3 Cadence
@@ -3127,7 +3247,7 @@ Split blocking from non-blocking auxiliary work. Blocking gets API-first with a 
 
 ### 20.5 Reserve auto-tuning
 
-Read the observed per-session request count over the last N days. Set the reserve from the p95 of that count. The sample floor applies; below it, use a conservative fixed reserve and label it provisional. Opt-in. Log the choice and the sample count.
+Read the observed per-session request count over the last N days. Set the reserve to the largest observed count (§4.13). The sample floor applies; below it, use a conservative fixed reserve and label it provisional. Opt-in. Log the choice and the sample count.
 
 ### 20.6 Recovery-instant propagation
 
@@ -3189,7 +3309,7 @@ A `doctor` command that outputs the deployment's actual config, chains, owners, 
 
 ## §21 — Document version
 
-**Version:** 3.2c
+**Version:** 3.3
 **Last updated:** 2026-10-15
 
 **Companion artifacts:**
@@ -3275,7 +3395,7 @@ If a deployment keeps these, the rule set stays honest. If it drops them, it pro
 
 ---
 
-**End of the guide, v3.2c.**
+**End of the guide, v3.3.**
 
 ---
 
@@ -3317,7 +3437,7 @@ numbers:
     question: "size above the p95 single-session draw; per-box"
   reserve_sample_floor:
     description: "minimum sessions before a p95 is trusted"
-    question: "recommended 59, derived from the rule of three"
+    question: "recommended 59: with at least 59 sessions, the largest observed draw is a 95%-confidence upper bound on the p95"
   stream_stale_min:
     description: "lower bound of the working range for the stream-stale timeout"
     question: "typical 120 seconds"
@@ -3360,6 +3480,9 @@ numbers:
     description: "minimum time a tier must be held before a switch away"
   config_writes_per_hour:
     description: "cap on config writes per rolling hour before the system is considered flapping"
+  manual_override_hours:
+    description: "how long a manual change pauses the selector before it re-plans"
+    question: "default 4; 4–6 recommended. A hold (no expiry) is requested explicitly, not configured here"
   global_signal_k:
     description: "distinct sessions with struggle required before a global change"
   global_signal_window:

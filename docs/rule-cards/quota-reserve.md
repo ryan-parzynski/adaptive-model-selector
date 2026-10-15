@@ -1,6 +1,6 @@
 # Rule card: quota-reserve
 
-**Status:** PROPOSED card. Consolidates §3.27, §4.9, §4.13, §6.5, invariants 6 and 17.
+**Status:** Adopted in v3.3. Consolidates §3.27, §4.9, §4.13, §6.5, invariants 6 and 17.
 
 ## Purpose
 

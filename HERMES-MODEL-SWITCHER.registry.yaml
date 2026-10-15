@@ -31,7 +31,7 @@ numbers:
     question: "size above the p95 single-session draw; per-box"
   reserve_sample_floor:
     description: "minimum sessions before a p95 is trusted"
-    question: "recommended 59, derived from the rule of three"
+    question: "recommended 59: with at least 59 sessions, the largest observed draw is a 95%-confidence upper bound on the p95"
   stream_stale_min:
     description: "lower bound of the working range for the stream-stale timeout"
     question: "typical 120 seconds"
@@ -74,6 +74,9 @@ numbers:
     description: "minimum time a tier must be held before a switch away"
   config_writes_per_hour:
     description: "cap on config writes per rolling hour before the system is considered flapping"
+  manual_override_hours:
+    description: "how long a manual change pauses the selector before it re-plans"
+    question: "default 4; 4–6 recommended. A hold (no expiry) is requested explicitly, not configured here"
   global_signal_k:
     description: "distinct sessions with struggle required before a global change"
   global_signal_window:

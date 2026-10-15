@@ -1,6 +1,6 @@
 # Rule card: local-as-main
 
-**Status:** PROPOSED card. Reframes §3.17, §3.18, §6.1, §6.3, §6.3a, §6.4, invariants 2, 9, 10.
+**Status:** Adopted in v3.3. Reframes §3.17, §3.18, §6.1, §6.3, §6.3a, §6.4, invariants 2, 9, 10.
 
 The specification states this as a blanket ban: "local is never a main model." That conclusion came from one kind of setup. This card keeps the **concern** and states **when it holds**, so an operator with fast local hardware can evaluate it instead of inheriting it.
 

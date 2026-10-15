@@ -15,7 +15,7 @@ the values are per-box.
 
 ## What this is
 
-- **A rule set.** Forty numbered invariants, seven failure classes (numbered 1–4 and 6–8), and the
+- **A rule set.** Forty-two numbered invariants, seven failure classes (numbered 1–4 and 6–8), and the
   procedures that enforce them.
 - **A specification, not an implementation.** The rules bind to model routing
   policy; where they bind to a specific runtime build, they say so.
@@ -54,13 +54,14 @@ Read it or don't; the rules stand alone.
     docs/two-axis-reporting.md            applicability vs. check result
     docs/capability-questionnaire.md      which rules apply to your setup
     docs/doctor-design.md                 read-only discovery tool (design)
+    docs/adapters/                        provider notes (dated; limits are read live)
     CHANGELOG.md                          version history
 
 A `checks/` directory of tested scripts is planned; it does not exist yet.
 
 ## Status
 
-- **Version:** 3.2c
+- **Version:** 3.3
 - **Verified:** source-verified against the running stack. The checks embedded
   in §10 are **illustrative, not tested scripts**; several have known defects.
   Do not copy them onto a live box. Tested checks will ship as files.
