@@ -1,0 +1,201 @@
+# Hermes Model Switcher registry.
+# Every {{...}} in the guide resolves to a key below.
+# Where a value is an operator choice, the description names the question.
+
+paths:
+  hermes_home:                 # the runtime home directory. Discover from the runtime, not from $HOME.
+  scripts_dir:                 # where the selector and helper scripts live
+  config_path:                 # the config.yaml the runtime reads
+  prefs_path:                  # the preference file
+  runtime_dir:                 # the runtime source path (may be outside hermes_home)
+  registry_file:               # this file's path
+  probe_budget_file:           # per-model probe budget table
+  local_inventory_file:        # dynamic local-inventory state
+  allowlist_file:              # operator-owned allowlist of card node ids
+  state_dir:                   # mode-700 state directory
+  alert_file:                  # alerts.json
+  ledger_file:                 # append-only run ledger
+  observation_ledger_file:     # append-only observation ledger (§30)
+  decision_ledger_file:        # append-only decision ledger with outcome records (§30)
+  capability_profile_file:     # this box's hardware and admitted local models (§31.7)
+  writer_registry_file:        # every writer of mutable routing state, with kind and status (§3.7a)
+
+config_keys:
+  model_default:               # e.g. "model.default"
+  model_provider:              # e.g. "model.provider"
+  stream_stale_timeout:        # logical name for the timeout value
+  stream_stale_timeout_key:    # the exact key the runtime reads; usually the local-stream variant
+  persist_switch_by_default_key:
+  toolsets_key:
+  owner_field:                 # the field the owner gate reads; usually "policy.owner"
+
+numbers:
+  reserve:
+    description: "free requests held back from the daily budget"
+    question: "size above the p95 single-session draw; per-box"
+  reserve_sample_floor:
+    description: "minimum sessions before a p95 is trusted"
+    question: "recommended 59: with at least 59 sessions, the largest observed draw is a 95%-confidence upper bound on the p95"
+  stream_stale_min:
+    description: "lower bound of the working range for the stream-stale timeout"
+    question: "typical 120 seconds"
+  stream_stale_max:
+    description: "upper bound of the working range"
+    question: "typical 300 seconds"
+  probe_interval:
+    description: "how often an active probe fires when idle"
+  probe_per_hour_cap:
+    description: "maximum active probes per hour"
+  probe_idle_window:
+    description: "idle time before an active probe fires"
+  probe_budget:
+    description: "hard timeout for a single probe call, sized to the model class"
+  recent_failure_ttl:
+    description: "how long a failed model is skipped"
+  quota_expiry_default:
+    description: "fallback expiry for a free-tier failure when no header is available"
+  loud_verification_window:
+    description: "how recently a delivery destination must have been verified for 'loud' to hold"
+  alert_staleness_multiplier:
+    description: "multiplier of the producer's schedule period before the heartbeat is stale"
+  ledger_staleness_multiplier:
+    description: "multiplier of the tick period before the ledger is stale"
+  skew_margin:
+    description: "allowance for clock skew when checking the post-reset delay"
+  max_post_reset_delay:
+    description: "maximum acceptable idle time after reset before the free tier is re-tried"
+  fail_closed_N:
+    description: "consecutive ticks on paid because of failure before the alert fires"
+  fail_closed_T:
+    description: "or minutes on paid because of failure before the alert fires"
+  fail_closed_M:
+    description: "consecutive ticks before holding current tier and repeating the alert"
+  free_return_K:
+    description: "healthy reads in a row required to return to free"
+  free_return_D:
+    description: "minimum minutes the healthy reads must cover"
+  state_min_dwell:
+    description: "minimum time a tier must be held before a switch away"
+  config_writes_per_hour:
+    description: "cap on config writes per rolling hour before the system is considered flapping"
+  catalog_min_fraction:
+    description: "a catalog smaller than this fraction of the previous run's count is treated as unreadable (§4.3)"
+    question: "e.g. 0.5; the right value depends on how much a provider's catalog normally fluctuates"
+  ledger_raw_retention_days:
+    description: "days raw observation and decision ledgers are kept before rotation; rollups are kept indefinitely"
+    question: "default 90"
+  escalation_max_steps:
+    description: "maximum one-tier escalations per task (§4.19)"
+    question: "default 2"
+  escalation_daily_budget:
+    description: "per-work-type daily spend allowed for escalated runs that land on a paid model (§4.19)"
+    question: "e.g. a few cents per work type; when spent, escalated output is delivered marked unverified"
+  capability_sample_floor:
+    description: "checked runs of a model for a work type before its track record counts in selection (§4.20)"
+    question: "e.g. 20"
+  exploration_share:
+    description: "share of low-stakes tasks used to try unrated models, on free or local lanes only (§4.20)"
+    question: "e.g. 0.05"
+  job_preapproval_usd:
+    description: "estimated job cost above which a long or heavy job asks before starting (§4.21)"
+  job_soft_limit_pct:
+    description: "share of a job's budget at which it downshifts to the cheapest capable lane and notifies (§4.21)"
+    question: "e.g. 80"
+  breaker_repeat_n:
+    description: "identical tool calls or errors in a row that trip the progress breaker (§4.21)"
+    question: "e.g. 3"
+  breaker_no_progress_minutes:
+    description: "minutes without new progress before the breaker pauses a job (§4.21)"
+  heartbeat_minutes:
+    description: "how often long jobs record progress (§4.21)"
+  lane_sample_minutes:
+    description: "how often the lane sampler records lane state (§30.9)"
+    question: "default 15"
+  guest_first_token_timeout_s:
+    description: "seconds a guest waits for a first token on a shared lane before falling back (§6.4b)"
+    question: "e.g. 20"
+  shared_lane_leads:
+    description: "for each shared local lane, the switcher that leads it (§6.4b)"
+    question: "e.g. gpu-lane-a: switcher on box-a"
+  box_daily_cap_usd:
+    description: "paid spend per day, whole box, all providers and work; unset = built-in catch (§4.22)"
+  budget_day_tz:
+    description: "time zone whose midnight resets daily budgets (§4.22)"
+  session_window_cap_usd:
+    description: "paid spend per chat session per rolling window (§4.22)"
+  session_window_hours:
+    description: "length of the chat window for the session cap (§4.22)"
+    question: "e.g. 4"
+  interactive_reserve_pct:
+    description: "share of the box daily cap background jobs may not use (§4.22)"
+    question: "e.g. 30"
+  auto_cap_multiple:
+    description: "multiple of typical daily spend (or provider-limit pace) for the built-in catch (§4.22)"
+    question: "e.g. 3"
+  auto_cap_floor_usd:
+    description: "built-in catch while there is under a week of history (§4.22)"
+    question: "e.g. 1.00"
+  test_mode_max_hours:
+    description: "longest a switcher stays in test mode after install or update (§4.23)"
+    question: "default 24"
+  manual_override_hours:
+    description: "how long a manual change pauses the selector before it re-plans"
+    question: "default 4; 4–6 recommended. A hold (no expiry) is requested explicitly, not configured here"
+  global_signal_k:
+    description: "distinct sessions with struggle required before a global change"
+  global_signal_window:
+    description: "window for the distinct sessions"
+  global_signal_baseline:
+    description: "struggle rate above which a global change is allowed"
+  local_inventory_cooldown:
+    description: "minimum time between applied inventory changes"
+  local_inventory_hysteresis_up:
+    description: "consecutive probes to enter the resolved set"
+  local_inventory_hysteresis_down:
+    description: "consecutive failures to leave the resolved set"
+  local_inventory_dwell:
+    description: "minimum uptime before a newly admitted peer serves batch work"
+
+lists:
+  capability_floors:
+    description: "starting minimum tier per work type, e.g. audit/status_report/migration_plan: mid; title/approval: small (§4.19)"
+  router_exclusion_patterns:
+    description: "id patterns for routers and guardrail models excluded from interactive ladders (§4.4a)"
+  selector_tools:
+    description: "every shelled-out tool the selector needs"
+  aux_chains_blocking:
+    description: "auxiliary chains a user turn waits on; API head required"
+  aux_chains_non_blocking:
+    description: "auxiliary chains the turn does not wait on; local head permitted"
+  aux_chains_unknown:
+    description: "chains whose blocking status is unknown; API head required by default"
+  cross_box_dependencies:
+    description: "chain entries on this box hosted by another box"
+
+placeholders:
+  box:                         "the deployment identifier"
+  peer:                        "the other deployment in a pair"
+  tailnet_ip:                  "the tailnet address of a card or box"
+  card_1:                      "first local inference host (role order)"
+  card_2:                      "second local inference host (role order)"
+  card_3:                      "third local inference host (role order)"
+  model_id:                    "a model id from the deployment's catalog"
+  image_model_id:              "an image-capable model id from the catalog"
+  provider:                    "a provider name from the deployment's config"
+  provider_key_var:            "the environment variable name holding a provider key"
+  helper_required_module:      "the module the switch helper imports"
+  dashboard_port:              "the dashboard's listening port"
+  quota_endpoint:              "the provider's quota-read endpoint"
+  probe_url:                   "the URL the health probe calls"
+  scheduler:                   "the scheduler command (cron, systemd, ...)"
+  task_system:                 "the task-system command"
+  specific_vendor:             "the paid-family vendor prefix"
+  selector_script:             "the active selector's script name"
+  health_script:               "the health-probe script name"
+  command:                     "a CLI command to verify"
+  flag:                        "a CLI flag to verify"
+  service_name:                "the supervisor's unit name"
+  port:                        "a listening port"
+  read_remaining:              "the command that reads remaining quota"
+  read_current_tier:           "the command that reads the current tier"
+  same_id:                     "a model id to test scope persistence without changing the default"
