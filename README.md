@@ -96,7 +96,7 @@ Read it or don't; the rules stand alone.
 
 ## Status
 
-What is proven, piloted or still experimental: see **`STATUS.md`**. The specification is frozen to box-verified fixes for about a week; new ideas go to `proposed/`.
+What is proven, piloted or still experimental: see **`STATUS.md`**. The specification is frozen to box-verified fixes for about a week; new ideas go to `proposed/`, and settled, set-aside or reversed conclusions (with revisit triggers) go to `decisions/`.
 
 ## Contributing
 
