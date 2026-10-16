@@ -11,7 +11,7 @@ Version history of `HERMES-MODEL-SWITCHER.md`. The current version is in `VERSIO
 ## v3.14.1 — 2026-10-15 — contribution fixes from the first real submission
 
 - `checks/contrib-validate.py` accepts the box outbox path (`contrib-outbox/reports/...`); it previously accepted only `contrib/...`, which pushed boxes to stage files elsewhere. It rejects a file named after the `contributor_id`: file names are fresh random hex per file.
-- `contrib/NAMING.md`: GPU memory band is the card's actual memory (12 GB and 16 GB cards are `8-16GB`).
+- `contrib/NAMING.md`: the GPU band comes from the card's actual memory (12 GB and 16 GB cards are `8-16GB`). `contrib/README.md`: boxes without GitHub access hand their validated files to a maintainer.
 
 **Adopters: action required**
 - Rename any outbox file named after your `contributor_id`, and recheck lane GPU bands.

@@ -46,7 +46,11 @@ A box that adopts the switcher **shares a `report/v1` once a day**, plus any `fi
 - **Asked once, at install.** The installing agent shows the operator what a report contains (a preview built from the box's own data) and asks. The default answer is **daily**. The answer is saved, with the date and who gave it, in `state/switcher-adoption.yaml`.
 - **The first report is held for the operator to review.** After that, reports go out daily on their own.
 - **Only the operator changes it.** No agent, update or contribution may turn sharing on or off, or change what is shared, without the operator's explicit, typed instruction. That instruction is recorded.
-- **Outbox:** reports wait in `state/contrib-outbox/` (mirroring the `contrib/` layout: `reports/YYYY-MM/`, `findings/<kind>/YYYY-MM/`) until they're uploaded. If an upload fails, they stay and are retried the next day. Files older than a day are compressed. Past the outbox size limit, the oldest daily reports are folded into one weekly rollup rather than dropped. Each file is flushed (deleted from the outbox) only after its upload is **confirmed**: the pull request exists and contains the file.
+- **Outbox:** reports wait in `state/contrib-outbox/` (mirroring the `contrib/` layout: `reports/YYYY-MM/`, `findings/<kind>/YYYY-MM/`) until they're uploaded. The validator accepts the outbox path directly. If an upload fails, they stay and are retried the next day. Files older than a day are compressed. Past the outbox size limit, the oldest daily reports are folded into one weekly rollup rather than dropped. Each file is flushed (deleted from the outbox) only after its upload is **confirmed**: the pull request exists and contains the file.
+
+## Boxes without GitHub access
+
+A box with no GitHub credentials can still contribute. It prints its validated outbox files; the operator passes them to a maintainer; the maintainer re-validates them and commits them under `contrib/`. The anonymity rules and validation are the same either way.
 
 ## How to submit (people and agents)
 
