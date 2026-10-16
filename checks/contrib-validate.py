@@ -4,7 +4,8 @@ and again in CI. Exit 0 valid, 1 invalid, 2 cannot-observe.
 
 Two lanes (contrib/README.md):
   contrib/reports/YYYY-MM/<8 hex>.yaml   schema report/v1   — anonymous performance rollups
-  contrib/findings/YYYY-MM/<8 hex>.yaml  schema finding/v1  — edge cases, bugs, optimizations, fixes
+  contrib/findings/<kind dir>/YYYY-MM/<8 hex>.yaml  schema finding/v1  — kind dirs: bugs, edge-cases,
+                                                   optimizations, fixes, unclear-rules
 
 Wild data is rejected here (unknown keys, wrong types, impossible ranges, oversize text, identifying
 strings) and discounted later (contrib/README.md: robust aggregation, quorum before any default changes).
@@ -69,14 +70,29 @@ FINDING = {
     "month": ("month",),
     "kind": ("enum", "bug", "edge_case", "optimization", "fix", "unclear_rule"),
     "sections": ("list", ("section",), 10),
+    "environment": {
+        "runtime_version": ("id",),
+        "providers": ("list", ("id",), 12),
+        "lane_types": ("list", ("enum", "local_gpu", "local_cpu", "peer_gpu", "peer_cpu", "api_free", "api_paid"), 6),
+        "gpu_class": ("enum", "none", "<=8GB", "8-16GB", "16-32GB", ">32GB", "multi"),
+        "virtualization": ("enum", "bare_metal", "vm", "container", "mixed", "unknown"),
+    },
     "observed": ("text",),
+    "how_to_reproduce": ("text",),
+    "why_it_matters": ("text",),
     "evidence": ("text",),
+    "scope": ("enum", "likely_everyone", "setups_like_mine", "only_my_setup", "unsure"),
+    "frequency": ("enum", "always", "often", "sometimes", "once"),
     "proposal": ("text",),
     "reason_codes": ("list", ("reason",), 20),
     "boxes_observed": num(1, 1000),
 }
 REQUIRED = {"report/v1": ["schema", "spec_version", "month", "period_days", "rollups"],
-            "finding/v1": ["schema", "spec_version", "month", "kind", "sections", "observed", "proposal"]}
+            "finding/v1": ["schema", "spec_version", "month", "kind", "sections", "environment", "observed",
+                           "how_to_reproduce", "why_it_matters", "evidence", "scope", "frequency", "proposal"]}
+KIND_DIR = {"bug": "bugs", "edge_case": "edge-cases", "optimization": "optimizations", "fix": "fixes",
+            "unclear_rule": "unclear-rules"}
+MIN_CONTEXT = 80   # characters: how and why need real context, not a one-liner
 
 errs = []
 
@@ -129,9 +145,9 @@ def main(paths):
     bad = 0
     for p in paths:
         global errs; errs = []
-        m = re.search(r"contrib/(reports|findings)/(20\d\d-\d\d)/[0-9a-f]{8}\.yaml$", p.replace(os.sep, "/"))
+        m = re.search(r"contrib/(reports|findings/[a-z-]+)/(20\d\d-\d\d)/[0-9a-f]{8}\.yaml$", p.replace(os.sep, "/"))
         if not m:
-            errs.append("path must be contrib/reports|findings/YYYY-MM/<8 hex>.yaml")
+            errs.append("path must be contrib/reports/YYYY-MM/<8 hex>.yaml or contrib/findings/<kind dir>/YYYY-MM/<8 hex>.yaml")
         try:
             raw = open(p, "rb").read()
         except OSError:
@@ -147,8 +163,15 @@ def main(paths):
             if spec is None:
                 errs.append("schema must be report/v1 or finding/v1")
             else:
-                if m and {"report/v1": "reports", "finding/v1": "findings"}[schema] != m.group(1):
-                    errs.append(f"{schema} belongs in contrib/{'reports' if schema=='report/v1' else 'findings'}/")
+                if m:
+                    want = "reports" if schema == "report/v1" else "findings/" + KIND_DIR.get(doc.get("kind"), "?")
+                    if m.group(1) != want:
+                        errs.append(f"this file belongs in contrib/{want}/")
+                if schema == "finding/v1":
+                    for k in ("observed", "how_to_reproduce", "why_it_matters", "evidence"):
+                        v = doc.get(k)
+                        if isinstance(v, str) and len(v.strip()) < MIN_CONTEXT:
+                            errs.append(f"{k}: too short; give at least {MIN_CONTEXT} characters of context")
                 for k in REQUIRED[schema]:
                     if k not in doc: errs.append(f"missing required field {k}")
                 check(spec, doc, "")

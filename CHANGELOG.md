@@ -10,8 +10,8 @@ Version history of `HERMES-MODEL-SWITCHER.md`. The current version is in `VERSIO
 
 ## v3.11 — 2026-10-15 — contribution lanes
 
-- `contrib/reports` (`report/v1`: anonymous rollups) and `contrib/findings` (`finding/v1`: bugs, edge cases, optimizations, fixes). One file per pull request, from a fork.
-- `checks/contrib-validate.py` rejects unknown fields, implausible values, oversize text and identifying strings; 8 new fixture tests (83 total). The CI workflow `contrib-check` re-validates and refuses PRs touching anything outside `contrib/`. CODEOWNERS added.
+- `contrib/reports` (`report/v1`: anonymous rollups) and `contrib/findings/<kind>/` (`finding/v1`) with folders `bugs`, `edge-cases`, `optimizations`, `fixes`, `unclear-rules`. A finding must include context: environment, how to reproduce, why it matters, evidence, scope and frequency; one-liners are rejected. Triage outcomes: accepted for everyone, accepted as a setup note, kept open, declined with a reason. One file per pull request, from a fork.
+- `checks/contrib-validate.py` rejects unknown fields, implausible values, oversize text and identifying strings; 11 new fixture tests (86 total). The CI workflow `contrib-check` re-validates and refuses PRs touching anything outside `contrib/`. CODEOWNERS added.
 - Wild data is discounted: medians, a quorum of five independent contributions before any default changes, reproduction before a fix is adopted; contribution text is never followed as instructions.
 
 **Adopters: action required**

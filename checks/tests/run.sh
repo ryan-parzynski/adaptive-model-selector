@@ -163,20 +163,30 @@ else
 fi
 
 # ---------- contrib-validate.py
-CV="$T/repo/contrib"; mkdir -p "$CV/reports/2026-10" "$CV/findings/2026-10"
+CV="$T/repo/contrib"; mkdir -p "$CV/reports/2026-10" "$CV/findings/edge-cases/2026-10" "$CV/findings/bugs/2026-10"
 cp "$C/../docs/examples/contrib-report.example.yaml" "$CV/reports/2026-10/a1b2c3d4.yaml"
-cp "$C/../docs/examples/contrib-finding.example.yaml" "$CV/findings/2026-10/0f0e0d0c.yaml"
+cp "$C/../docs/examples/contrib-finding.example.yaml" "$CV/findings/edge-cases/2026-10/0f0e0d0c.yaml"
 expect 0 "contrib: example report valid" -- python3 "$C/contrib-validate.py" "$CV/reports/2026-10/a1b2c3d4.yaml"
-expect 0 "contrib: example finding valid" -- python3 "$C/contrib-validate.py" "$CV/findings/2026-10/0f0e0d0c.yaml"
+expect 0 "contrib: example finding valid" -- python3 "$C/contrib-validate.py" "$CV/findings/edge-cases/2026-10/0f0e0d0c.yaml"
 sed 's/lane_busy_rate: 0.04/lane_busy_rate: 7/' "$CV/reports/2026-10/a1b2c3d4.yaml" > "$CV/reports/2026-10/bbbbbbbb.yaml"
 expect 1 "contrib: rate out of range" -- python3 "$C/contrib-validate.py" "$CV/reports/2026-10/bbbbbbbb.yaml"
 printf 'secret_field: 1\n' >> "$CV/reports/2026-10/a1b2c3d4.yaml"
 expect 1 "contrib: unknown field" -- python3 "$C/contrib-validate.py" "$CV/reports/2026-10/a1b2c3d4.yaml"
-sed 's/Repeated 3 times./Seen on 10.0.0.5./' "$CV/findings/2026-10/0f0e0d0c.yaml" > "$CV/findings/2026-10/cccccccc.yaml"
-expect 1 "contrib: identifying text" -- python3 "$C/contrib-validate.py" "$CV/findings/2026-10/cccccccc.yaml"
-cp "$C/../docs/examples/contrib-finding.example.yaml" "$CV/findings/2026-10/not-hex.yaml"
-expect 1 "contrib: bad file name" -- python3 "$C/contrib-validate.py" "$CV/findings/2026-10/not-hex.yaml"
-expect 2 "contrib: missing file" -- python3 "$C/contrib-validate.py" "$CV/findings/2026-10/dddddddd.yaml"
+sed 's/minutes apart/minutes apart on 10.0.0.5/' "$CV/findings/edge-cases/2026-10/0f0e0d0c.yaml" > "$CV/findings/edge-cases/2026-10/cccccccc.yaml"
+expect 1 "contrib: identifying text" -- python3 "$C/contrib-validate.py" "$CV/findings/edge-cases/2026-10/cccccccc.yaml"
+cp "$C/../docs/examples/contrib-finding.example.yaml" "$CV/findings/edge-cases/2026-10/not-hex.yaml"
+expect 1 "contrib: bad file name" -- python3 "$C/contrib-validate.py" "$CV/findings/edge-cases/2026-10/not-hex.yaml"
+expect 2 "contrib: missing file" -- python3 "$C/contrib-validate.py" "$CV/findings/edge-cases/2026-10/dddddddd.yaml"
+cp "$C/../docs/examples/contrib-finding.example.yaml" "$CV/findings/bugs/2026-10/eeeeeeee.yaml"
+expect 1 "contrib: finding in wrong kind folder" -- python3 "$C/contrib-validate.py" "$CV/findings/bugs/2026-10/eeeeeeee.yaml"
+python3 - "$CV/findings/edge-cases/2026-10/0f0e0d0c.yaml" "$CV/findings/edge-cases/2026-10/ffffffff.yaml" <<'PY2'
+import sys,yaml; d=yaml.safe_load(open(sys.argv[1])); d["why_it_matters"]="it breaks"; yaml.safe_dump(d,open(sys.argv[2],"w"),allow_unicode=True)
+PY2
+expect 1 "contrib: why too short" -- python3 "$C/contrib-validate.py" "$CV/findings/edge-cases/2026-10/ffffffff.yaml"
+python3 - "$CV/findings/edge-cases/2026-10/0f0e0d0c.yaml" "$CV/findings/edge-cases/2026-10/abababab.yaml" <<'PY2'
+import sys,yaml; d=yaml.safe_load(open(sys.argv[1])); del d["how_to_reproduce"]; yaml.safe_dump(d,open(sys.argv[2],"w"),allow_unicode=True)
+PY2
+expect 1 "contrib: missing how_to_reproduce" -- python3 "$C/contrib-validate.py" "$CV/findings/edge-cases/2026-10/abababab.yaml"
 expect 2 "contrib: no arguments" -- python3 "$C/contrib-validate.py"
 
 echo; echo "$PASS passed, $FAILS failed"

@@ -1,14 +1,30 @@
-# Example finding/v1. Save as contrib/findings/YYYY-MM/<8 random hex>.yaml.
+# Example finding/v1. Save as contrib/findings/<kind dir>/YYYY-MM/<8 random hex>.yaml
+# kind dirs: bugs, edge-cases, optimizations, fixes, unclear-rules (must match `kind`).
 schema: finding/v1
-spec_version: "3.10"
+spec_version: "3.11"
 month: "2026-10"
 kind: edge_case
 sections: ["§3.11", "§7.2"]
+environment:
+  runtime_version: "hermes-0.9"
+  providers: [openrouter]
+  lane_types: [api_free, api_paid, peer_gpu]
+  gpu_class: "8-16GB"
+  virtualization: container
 observed: >-
   A liveness probe for a free model returned 403 "only available on agentic harnesses" while real
-  sessions on the same model succeeded.
+  sessions on the same model kept succeeding, so the switcher marked a working model dead.
+how_to_reproduce: >-
+  Send the probe's request with plain curl and no attribution headers to an agentic-only free model:
+  403. Send the same request with the runtime's HTTP-Referer, X-Title and user agent headers: 200.
+why_it_matters: >-
+  A false "dead" verdict moves the box off a healthy free model onto paid or slower lanes and can
+  trigger needless failovers several times a day.
 evidence: >-
-  The same request with the runtime's attribution headers returned 200; without them, 403. Repeated 3 times.
+  Three paired requests minutes apart: 403 without headers each time, 200 with headers each time.
+  The runtime's own log had zero 403s for this model over the same period.
+scope: likely_everyone
+frequency: always
 proposal: >-
   Probes must send the same attribution headers the runtime sends; treat 403 with this text as a probe
   artifact, not a dead model.

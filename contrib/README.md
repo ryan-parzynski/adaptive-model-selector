@@ -7,7 +7,33 @@ Anyone running the switcher can send back what they learned: **anonymously, in a
 | Lane | Path | Schema | What goes in it |
 |---|---|---|---|
 | Reports | `contrib/reports/YYYY-MM/<8 hex>.yaml` | `report/v1` | Rollups from your ledgers: switch rates, reason counts, first-token latency by lane class, spend per day, limit hits, per-model pass rates. Hardware in size bands only. |
-| Findings | `contrib/findings/YYYY-MM/<8 hex>.yaml` | `finding/v1` | A bug, edge case, optimization or fix: which spec sections, what was observed, the evidence, and the proposed change. |
+| Findings | `contrib/findings/<kind>/YYYY-MM/<8 hex>.yaml` | `finding/v1` | One bug, edge case, optimization, fix or unclear rule, **with context** (below). |
+
+Findings go in a folder for their kind: `bugs/`, `edge-cases/`, `optimizations/`, `fixes/`, `unclear-rules/`.
+
+## What a finding must include
+
+A finding is judged on its context, so every one needs **all** of these. The validator refuses one without them, and refuses one-liners:
+
+| Field | What it answers |
+|---|---|
+| `environment` | What kind of setup: runtime version, providers, lane types, GPU size band, bare metal / VM / container. |
+| `observed` | What happened. |
+| `how_to_reproduce` | The steps someone else can follow to see it. |
+| `why_it_matters` | The effect: cost, failures, wrong switches, wasted time. |
+| `evidence` | What was measured, and how often. |
+| `scope` | Your honest guess: `likely_everyone`, `setups_like_mine`, `only_my_setup` or `unsure`. |
+| `frequency` | `always`, `often`, `sometimes` or `once`. |
+| `proposal` | What should change. |
+
+## Triage: what gets in
+
+Nothing is accepted automatically. The maintainer reads each finding and decides:
+
+- **Accepted for everyone:** it reproduces, or the evidence is convincing, and it applies beyond one setup. It becomes a spec change, a rule card or a check, credited to the finding's id.
+- **Accepted as a setup note:** real, but only for certain setups (a runtime version, a provider, containers). It's recorded as a conditional note, not a general rule.
+- **Kept open:** plausible, but needs more evidence. Further findings with the same `reason_codes` count toward the quorum.
+- **Declined:** can't be reproduced, only applies to one machine, or conflicts with a rule that exists for a stated reason. Closed with a one-line reason, so the next person can see why.
 
 Examples: `docs/examples/contrib-report.example.yaml`, `docs/examples/contrib-finding.example.yaml`. Name the file with 8 random hex characters (`openssl rand -hex 4`). **One file per pull request.**
 
