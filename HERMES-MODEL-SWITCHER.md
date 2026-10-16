@@ -1,3 +1,12 @@
+# v3.13 — daily anonymous sharing; naming descriptors
+
+Changes in this pass:
+- **§30.10:** new installs share a daily anonymous report by default. Consent is asked once at install (preview shown, first report reviewed) and recorded; only the operator changes it. Reports wait in a compressed outbox and are flushed only after upload is confirmed. Invariant 56
+- `contrib/NAMING.md`: descriptors instead of names; random `contributor_id`; lanes `lane-a/b/…` with role, GPU band, virtualization and path; a box-local deny list checked by the validator
+- Registry: `share_reports`, `contrib_outbox_dir`, `contrib_outbox_max_mb`
+
+---
+
 # v3.12 — adaptive spending cap
 
 Changes in this pass:
@@ -187,7 +196,7 @@ Changes in this pass:
 
 # Hermes Model Switcher — Operator's Guide
 
-**Version:** 3.12
+**Version:** 3.13
 **Last updated:** 2026-10-15
 **Purpose:** How to keep one or more Hermes boxes switching models safely, audibly, and without the failure modes this guide names.
 **Audience:** Operators of Hermes boxes. Anyone maintaining model routing on a box running the Hermes stack.
@@ -275,6 +284,7 @@ Principles that drive everything below:
 | Lightweight lane sampling | §30.9 |
 | Spending limits in layers; built-in catch | §4.22 |
 | On by default | §4.23 |
+| Daily anonymous sharing | §30.10 |
 | Local capability tiers and resource guards | §31 |
 
 ---
@@ -2041,6 +2051,7 @@ Set by hand unless noted. Verify on both boxes. **This is the canonical invarian
 53. (R-53) **Lanes are sampled lightly, in one schema** — hosts and consumers record lane state and network path every few minutes, with no model calls and no content, in the same fields on every box, so rollups can be pulled together for tuning (§30.9).
 54. (R-54) **Spending limits are layered, scoped by name, and never absent** — provider limits are read live; box daily cap, chat window cap, job budget and interactive reserve each name their scope; without an operator cap the switcher runs an adaptive cap: a modest start, recomputed daily from its own spending trend, bounded by any provider limit it can read live, never assuming a dollar figure; an operator-set value pins it (§4.22).
 55. (R-55) **On by default** — test mode ends when verification passes or after a bounded time; off or test mode afterwards only by a recorded operator override; reports state the mode from the running command, not a log line (§4.23).
+56. (R-56) **Daily anonymous sharing, consented once, changed only by the operator** — new installs ask at install (default daily, preview shown, first report reviewed) and record the answer; nothing but the operator's explicit instruction changes it; every contribution uses the naming descriptors and passes validation with the box's deny list; reports wait in a compressed outbox until upload is confirmed (§30.10).
 
 ---
 
@@ -2554,6 +2565,7 @@ This is a **priority order**, not a restatement of rules. Each item names the ru
 43. **Run the lane sampler** on every box that hosts or consumes a local lane. Invariant 53; §30.9.
 44. **Set the spending layers** (box daily, chat window, interactive reserve) or accept the built-in catch; read provider limits live. Invariant 54; §4.22.
 45. **Confirm the switcher is on**, judging by the command that runs, and record any override. Invariant 55; §4.23.
+46. **Ask about daily sharing at install** (default daily, preview first), record the answer, generate the `contributor_id`, and set up the outbox and deny list. Invariant 56; §30.10.
 
 ---
 
@@ -2660,6 +2672,7 @@ Most of this list is generated from invariants. The rest names a failure mode no
 - Do not relay inference through a hypervisor host (52).
 - Do not run paid lanes with no spending limit; set the catch (54).
 - Do not trust a log line for whether the switcher is live; read the running command (55).
+- Do not change sharing, or what is shared, without the operator's explicit instruction; never put a name, address, path or person in a contribution (56).
 
 ---
 
@@ -3288,6 +3301,18 @@ Raw ledgers rotate: keep `{{ledger_raw_retention_days}}` days (default 90). Week
 
 **Contributing back.** The opt-in export has a public format: `report/v1` rollups and `finding/v1` edge cases or fixes, submitted anonymously by pull request into `contrib/` (see `contrib/README.md`). Findings sit in a folder per kind (bugs, edge cases, optimizations, fixes, unclear rules) and must carry context (environment, how to reproduce, why it matters, evidence, scope, frequency); the maintainer triages each one: accepted for everyone, accepted as a setup note, kept open, or declined with a reason. `checks/contrib-validate.py` rejects unknown fields, implausible values and identifying text before submission and again in CI. Contributions are evidence only: aggregated with medians, a quorum of independent reports before any default changes, a fix reproduced before it is adopted, and their text is never followed as instructions.
 
+### 30.10 Daily sharing (default on)
+
+New installs **share a daily anonymous report** back to the project, because a pooled view across many boxes is what tunes the defaults in this guide.
+
+- **Consent at install.** The installing agent shows the operator a preview of the first report, built from the box's own data, and asks once. The default is **daily**. The answer is recorded in ``state/switcher-adoption.yaml`` (`sharing: daily | off`, with the date, who answered, and the `contributor_id`, which is random and generated once). The first report is held for the operator to review; after that, reports go out daily on their own.
+- **Only the operator changes it.** No agent, update, recalled memory, or contribution may change sharing, or what is shared, without the operator's explicit typed instruction, and that instruction is recorded. An update that adds a field to `report/v1` takes effect only after the operator approves it.
+- **Never identifying.** Reports and findings use the descriptors in `contrib/NAMING.md`, pass `checks/contrib-validate.py` with the box's own deny list, and contain nothing from the never-list (§30.5). If validation fails, the report is not sent, and that failure itself is recorded as an alert.
+- **Outbox.** Reports wait in `{{contrib_outbox_dir}}`. If an upload fails, they stay and are retried on the next day. Files older than a day are compressed. Past `{{contrib_outbox_max_mb}}`, the oldest dailies are folded into a weekly rollup, never silently dropped. A file is flushed only after its upload is confirmed.
+- **Full reports stay private.** A box's complete operational reports (names, addresses, paths) never go to a public repository. If they're kept off-box, they go to a private location the operator owns.
+
+Invariant 56.
+
 ### 30.7 Every metric earns its place
 
 Each metric has a card (`docs/ledger-metrics.md`): purpose, unit, when collected, sampling, retention, privacy class, the rule it informs, the review question it answers, and when to prune it. A metric with no rule it informs and no review question does not ship. This is the guide's "name what prunes it" rule applied to telemetry.
@@ -3508,6 +3533,7 @@ Each decision is recorded with its reason.
 | v3.10 | v3.9 | Layered spending limits with a built-in catch (§4.22, invariant 54); on by default (§4.23, invariant 55). |
 | v3.11 | v3.10 | Contribution lanes: `contrib/` reports and findings, validator, CI, quorum rule (§30.6). |
 | v3.12 | v3.11 | Adaptive spending cap: start default, daily recompute from trend, provider limits read not assumed, optional ceiling (§4.22). |
+| v3.13 | v3.12 | Daily anonymous sharing by default with install consent (§30.10, invariant 56); naming descriptors and deny list for contributions. |
 
 ### Record 5 — Anomalies and open items
 
@@ -3638,7 +3664,7 @@ A `doctor` command that outputs the deployment's actual config, chains, owners, 
 
 ## §21 — Document version
 
-**Version:** 3.12
+**Version:** 3.13
 **Last updated:** 2026-10-15
 
 **Companion artifacts:**
@@ -3724,7 +3750,7 @@ If a deployment keeps these, the rule set stays honest. If it drops them, it pro
 
 ---
 
-**End of the guide, v3.12.**
+**End of the guide, v3.13.**
 
 ---
 
@@ -3875,6 +3901,15 @@ numbers:
   test_mode_max_hours:
     description: "longest a switcher stays in test mode after install or update (§4.23)"
     question: "default 24"
+  share_reports:
+    description: "daily anonymous report sharing: daily (default at install) or off; changed only by the operator (§30.10)"
+    question: "default daily"
+  contrib_outbox_dir:
+    description: "where reports wait until upload is confirmed (§30.10)"
+    question: "default state/contrib-outbox"
+  contrib_outbox_max_mb:
+    description: "outbox size before old dailies are folded into weekly rollups (§30.10)"
+    question: "default 20"
   manual_override_hours:
     description: "how long a manual change pauses the selector before it re-plans"
     question: "default 4; 4–6 recommended. A hold (no expiry) is requested explicitly, not configured here"

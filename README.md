@@ -35,7 +35,7 @@ The full list, with section references, is §0 of the specification.
 
 ## What this is
 
-- **A rule set.** Fifty-five numbered invariants, seven failure classes (numbered 1–4 and 6–8), and the
+- **A rule set.** Fifty-six numbered invariants, seven failure classes (numbered 1–4 and 6–8), and the
   procedures that enforce them.
 - **A specification, not an implementation.** The rules bind to model routing
   policy; where they bind to a specific runtime build, they say so.
@@ -85,7 +85,7 @@ Read it or don't; the rules stand alone.
 
 ## Status
 
-- **Version:** 3.12 (see `VERSION`; history and adopter actions in `CHANGELOG.md`)
+- **Version:** 3.13 (see `VERSION`; history and adopter actions in `CHANGELOG.md`)
 - **Verified:** source-verified against the running stack. The checks in
   `checks/` are tested against fixtures (`checks/tests/run.sh`) but not yet on a
   live Hermes box. Code blocks remaining inside the specification are
@@ -99,7 +99,7 @@ Read it or don't; the rules stand alone.
 Discussion in **GitHub Discussions**; concrete bugs and proposals in **GitHub
 Issues**. Anonymous performance reports and findings (edge cases, fixes) from
 running boxes go in by pull request under `contrib/`, in a fixed format that is
-validated before submission and in CI; see `contrib/README.md`. If a rule here is wrong for your environment, open a Discussion and
+validated before submission and in CI; see `contrib/README.md`. New installs share a daily anonymous report by default (asked once at install; only the operator changes it); see `contrib/NAMING.md` for how setups are described without identifying anyone. If a rule here is wrong for your environment, open a Discussion and
 say so. Rules that fail against a real deployment are the most valuable input
 this specification can receive.
 

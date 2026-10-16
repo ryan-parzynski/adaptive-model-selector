@@ -187,6 +187,13 @@ python3 - "$CV/findings/edge-cases/2026-10/0f0e0d0c.yaml" "$CV/findings/edge-cas
 import sys,yaml; d=yaml.safe_load(open(sys.argv[1])); del d["how_to_reproduce"]; yaml.safe_dump(d,open(sys.argv[2],"w"),allow_unicode=True)
 PY2
 expect 1 "contrib: missing how_to_reproduce" -- python3 "$C/contrib-validate.py" "$CV/findings/edge-cases/2026-10/abababab.yaml"
+printf 'box-alpha\n10.9.9.9\n' > "$T/deny.txt"
+sed 's/minutes apart/minutes apart on BOX-ALPHA/' "$C/../docs/examples/contrib-finding.example.yaml" > "$CV/findings/edge-cases/2026-10/12345678.yaml"
+expect 1 "contrib: deny-list term (any case)" -- python3 "$C/contrib-validate.py" --deny-file "$T/deny.txt" "$CV/findings/edge-cases/2026-10/12345678.yaml"
+expect 0 "contrib: deny list, clean file" -- python3 "$C/contrib-validate.py" --deny-file "$T/deny.txt" "$CV/findings/edge-cases/2026-10/0f0e0d0c.yaml"
+expect 2 "contrib: deny file missing" -- python3 "$C/contrib-validate.py" --deny-file "$T/nope.txt" "$CV/findings/edge-cases/2026-10/0f0e0d0c.yaml"
+sed 's/id: lane-a/id: gpubox1/' "$C/../docs/examples/contrib-report.example.yaml" > "$CV/reports/2026-10/9a9a9a9a.yaml"
+expect 1 "contrib: lane named, not lettered" -- python3 "$C/contrib-validate.py" "$CV/reports/2026-10/9a9a9a9a.yaml"
 expect 2 "contrib: no arguments" -- python3 "$C/contrib-validate.py"
 
 echo; echo "$PASS passed, $FAILS failed"

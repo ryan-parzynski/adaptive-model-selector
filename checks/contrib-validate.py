@@ -9,7 +9,9 @@ Two lanes (contrib/README.md):
 
 Wild data is rejected here (unknown keys, wrong types, impossible ranges, oversize text, identifying
 strings) and discounted later (contrib/README.md: robust aggregation, quorum before any default changes).
-Usage: contrib-validate.py FILE...
+Usage: contrib-validate.py [--deny-file FILE] FILE...
+  --deny-file: a box-local list (one term per line) of this box's own names, aliases, addresses,
+  users and paths. Never committed. Any match anywhere in a contribution is rejected (contrib/NAMING.md).
 """
 import os, re, sys
 try:
@@ -31,11 +33,26 @@ IDENTIFYING = [
     (re.compile(r"\b(sk|pk|ghp|gho|xox[abp])[-_][A-Za-z0-9_-]{8,}"), "key-like string"),
 ]
 
+LANE_ID_RE = re.compile(r"^lane-[a-z]$")
+LANE = {
+    "id": ("lane",),
+    "role": ("enum", "local_gpu", "local_cpu", "peer_gpu", "peer_cpu", "relayed_peer_gpu", "api"),
+    "gpu": ("enum", "none", "nvidia-<=8GB", "nvidia-8-16GB", "nvidia-16-32GB", "nvidia->32GB",
+            "intel-<=8GB", "intel-8-16GB", "amd-<=8GB", "amd-8-16GB", "amd-16-32GB", "apple", "other"),
+    "virtualization": ("enum", "bare_metal", "vm", "container", "unknown"),
+    "path": ("enum", "same_box", "same_host", "lan", "remote_direct", "remote_relayed"),
+    "runtime": ("enum", "ollama", "llama.cpp", "vllm", "other"),
+    "first_token_ms_p50": ("num", 0, 600_000),
+    "busy_rate": ("num", 0, 1),
+    "on_gpu_rate": ("num", 0, 1),
+}
+
 def num(lo, hi):
     return ("num", lo, hi)
 
 REPORT = {
     "schema": "report/v1",
+    "contributor_id": ("hex8",),
     "spec_version": ("str",),
     "month": ("month",),
     "period_days": num(1, 92),
@@ -46,6 +63,8 @@ REPORT = {
         "local_lanes": num(0, 32),
         "peer_lanes": num(0, 32),
         "providers": ("list", ("id",), 12),
+        "role": ("enum", "consumer", "gpu_host", "consumer_and_gpu_host"),
+        "lanes": ("list", LANE, 26),
     },
     "rollups": {
         "switches_per_day": num(0, 1440),
@@ -66,6 +85,7 @@ REPORT = {
 }
 FINDING = {
     "schema": "finding/v1",
+    "contributor_id": ("hex8",),
     "spec_version": ("str",),
     "month": ("month",),
     "kind": ("enum", "bug", "edge_case", "optimization", "fix", "unclear_rule"),
@@ -76,6 +96,7 @@ FINDING = {
         "lane_types": ("list", ("enum", "local_gpu", "local_cpu", "peer_gpu", "peer_cpu", "api_free", "api_paid"), 6),
         "gpu_class": ("enum", "none", "<=8GB", "8-16GB", "16-32GB", ">32GB", "multi"),
         "virtualization": ("enum", "bare_metal", "vm", "container", "mixed", "unknown"),
+        "lanes": ("list", LANE, 26),
     },
     "observed": ("text",),
     "how_to_reproduce": ("text",),
@@ -106,6 +127,10 @@ def scalar(rule, v, where):
     elif t == "enum":
         if v not in rule[1:]:
             errs.append(f"{where}: must be one of {', '.join(map(str, rule[1:]))}")
+    elif t in ("hex8", "lane"):
+        rx = r"^[0-9a-f]{8}$" if t == "hex8" else r"^lane-[a-z]$"
+        if not isinstance(v, str) or not re.match(rx, v):
+            errs.append(f"{where}: must look like {'8 random hex characters' if t == 'hex8' else 'lane-a, lane-b, ...'}")
     elif t in ("str", "id", "reason", "section", "month", "text"):
         if not isinstance(v, str):
             errs.append(f"{where}: must be text"); return
@@ -139,7 +164,17 @@ def check(rule, v, where):
     else:
         scalar(rule, v, where)
 
-def main(paths):
+def main(argv):
+    deny = []
+    if argv[:1] == ["--deny-file"]:
+        if len(argv) < 2:
+            print("CANNOT-OBSERVE: --deny-file needs a path"); return 2
+        try:
+            deny = [t.strip().lower() for t in open(argv[1]) if t.strip() and not t.startswith("#")]
+        except OSError:
+            print(f"CANNOT-OBSERVE: deny file {argv[1]} unreadable"); return 2
+        argv = argv[2:]
+    paths = argv
     if not paths:
         print("CANNOT-OBSERVE: no files given"); return 2
     bad = 0
@@ -153,6 +188,11 @@ def main(paths):
         except OSError:
             print(f"CANNOT-OBSERVE: {p} unreadable"); return 2
         if len(raw) > MAX_FILE: errs.append(f"file larger than {MAX_FILE} bytes")
+        low = raw.decode("utf-8", "replace").lower()
+        for term in deny:
+            if term and term in low:
+                errs.append("contains a term from this box's deny list (a local name, alias, address, user or path); use the descriptors in contrib/NAMING.md")
+                break
         try:
             doc = yaml.safe_load(raw)
         except yaml.YAMLError:

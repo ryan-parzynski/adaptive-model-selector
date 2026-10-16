@@ -289,6 +289,18 @@ deferred:                     # rules knowingly not adopted yet, with reason
 
 This record is what the update path (guide §5) starts from. Keep it current; it is the box's answer to "which version are we on, and what did we decide?"
 
+### 7.1a Ask about daily sharing (new installs)
+
+Before finishing an install, ask the operator **once** about daily anonymous sharing (spec §30.10):
+
+1. Build a preview `report/v1` from this box's own data, following `contrib/NAMING.md`.
+2. Show the preview to the operator, and say that sharing is daily by default.
+3. Record the answer (`daily` or `off`), the date, and who answered in `state/switcher-adoption.yaml`, together with a newly generated random `contributor_id`.
+4. Create `state/contrib-deny.txt` from this box's own names, aliases, lanes, peers, addresses, users and home paths, and the outbox directory.
+5. Hold the first report for the operator to review.
+
+On an **update** or **merge**, don't ask again. Keep the recorded answer, and never change it without the operator's explicit instruction.
+
 ### 7.2 Start the ledgers early
 
 Even before any selector exists, recording observations (§30) starts the evidence clock: per-session request draws, limit snapshots, overrides and fallbacks. Every measured value the specification asks for — the reserve, local latency, aux-chain overlap, the override window — needs history first. The ledgers are descriptive until the operator enables tuning for a specific rule (invariant 44).
@@ -339,7 +351,7 @@ Every path:
 | A2 | Fixture tests run **in this run**; result recorded | `checks/tests/run.sh` exit code and summary line |
 | A3 | Hermes home resolved from the runtime | The process environment or runtime source you read it from |
 | A4 | Every capability question answered `present` / `absent` / `unknown` | Evidence per answer, or the question that resolves it |
-| A5 | Every invariant (1–55) has an applicability; every applicable one has a check result or a documented manual review with evidence | The Rules table |
+| A5 | Every invariant (1–56) has an applicability; every applicable one has a check result or a documented manual review with evidence | The Rules table |
 | A6 | Every applicable check in `checks/` run in this run | Command, exit code, timestamp |
 | A7 | Each runtime fact in guide §3.6 is source-verified, live-run-verified, or `unknown` with the command that would settle it | The Runtime facts table |
 | A8 | **Live routing unchanged by the run** | SHA-256 of `config.yaml` and of the scheduler's job listing, taken at the start and the end; they must match. (If the operator changed something meanwhile, say so; that is a foreign write, not yours.) |

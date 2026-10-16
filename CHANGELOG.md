@@ -8,6 +8,15 @@ Version history of `HERMES-MODEL-SWITCHER.md`. The current version is in `VERSIO
 
 ---
 
+## v3.13 — 2026-10-15 — daily anonymous sharing; naming descriptors
+
+- §30.10: daily anonymous `report/v1` sharing is the install default. The operator is asked once (preview shown, first report reviewed) and the answer recorded; only the operator changes it. Reports wait in a compressed outbox, roll up weekly past a size limit, and are flushed only after upload is confirmed. Full reports never go public. Invariant 56.
+- `contrib/NAMING.md`: a random `contributor_id`; lanes as `lane-a/b/…` with role, GPU vendor and memory band, virtualization and path; size bands; a never-list.
+- `checks/contrib-validate.py`: lane descriptors, `contributor_id`, and `--deny-file` for the box's own names (a box-local file, never committed). New fixture tests.
+
+**Adopters: action required**
+- Existing installs: ask the operator about daily sharing once (AGENT-GUIDE §7.1a), record the answer, and create the deny list and outbox. Until asked, sharing is off.
+
 ## v3.12 — 2026-10-15 — adaptive spending cap
 
 - §4.22: without an operator cap, the cap adapts. It starts at `auto_cap_start_usd` and is recomputed once a day as `auto_cap_multiple` × the 14-day median spend, with that start value as its minimum. It is bounded by an optional `auto_cap_max_usd` and by any provider periodic limit **read live**; no provider figure or dollar amount is assumed. Every recomputation is logged; an operator-set value pins it.

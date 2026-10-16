@@ -140,6 +140,15 @@ numbers:
   test_mode_max_hours:
     description: "longest a switcher stays in test mode after install or update (§4.23)"
     question: "default 24"
+  share_reports:
+    description: "daily anonymous report sharing: daily (default at install) or off; changed only by the operator (§30.10)"
+    question: "default daily"
+  contrib_outbox_dir:
+    description: "where reports wait until upload is confirmed (§30.10)"
+    question: "default state/contrib-outbox"
+  contrib_outbox_max_mb:
+    description: "outbox size before old dailies are folded into weekly rollups (§30.10)"
+    question: "default 20"
   manual_override_hours:
     description: "how long a manual change pauses the selector before it re-plans"
     question: "default 4; 4–6 recommended. A hold (no expiry) is requested explicitly, not configured here"

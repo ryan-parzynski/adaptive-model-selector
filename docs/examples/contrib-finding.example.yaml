@@ -1,6 +1,7 @@
 # Example finding/v1. Save as contrib/findings/<kind dir>/YYYY-MM/<8 random hex>.yaml
 # kind dirs: bugs, edge-cases, optimizations, fixes, unclear-rules (must match `kind`).
 schema: finding/v1
+contributor_id: "3f9a1c07"
 spec_version: "3.11"
 month: "2026-10"
 kind: edge_case
