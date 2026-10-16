@@ -1,3 +1,11 @@
+# v3.14 — adaptive check cadence, damped switching, live limit changes
+
+Changes in this pass:
+- **§4.24:** checks speed up near a limit (or when the burn rate projects running out) and immediately on events; optional switches need a sustained gain; a mid-day limit change is an event that recomputes the reserve and thresholds. Invariant 57
+- Registry: `tick_relaxed_minutes`, `tick_close_minutes`, `tick_close_pct`, `switch_gain_pct`
+
+---
+
 # v3.13 — daily anonymous sharing; naming descriptors
 
 Changes in this pass:
@@ -196,7 +204,7 @@ Changes in this pass:
 
 # Hermes Model Switcher — Operator's Guide
 
-**Version:** 3.13
+**Version:** 3.14
 **Last updated:** 2026-10-15
 **Purpose:** How to keep one or more Hermes boxes switching models safely, audibly, and without the failure modes this guide names.
 **Audience:** Operators of Hermes boxes. Anyone maintaining model routing on a box running the Hermes stack.
@@ -285,6 +293,7 @@ Principles that drive everything below:
 | Spending limits in layers; built-in catch | §4.22 |
 | On by default | §4.23 |
 | Daily anonymous sharing | §30.10 |
+| Check cadence and switch damping | §4.24 |
 | Local capability tiers and resource guards | §31 |
 
 ---
@@ -1609,6 +1618,29 @@ After that, **on is the default.** Off or test mode happens only through a recor
 
 Invariant 55.
 
+### 4.24 Check often when it matters; switch only when it pays
+
+How often to **check** and how often to **switch** are separate questions.
+
+**Checking adapts to headroom.** A check (a live limit read, health and price) is cheap; it's not a model call. Its interval follows how close the box is to a limit:
+
+- **Plenty of headroom:** every `{{tick_relaxed_minutes}}` minutes (default 30).
+- **Getting close:** every `{{tick_close_minutes}}` minutes (default 5). Close means remaining below `{{tick_close_pct}}`% of the limit, **or** the current burn rate (requests or spend per hour over the last hour) projects running out before the reset.
+- **Events check immediately:** a 429, a provider error, a failed probe, a manual override ending, or a **limit change**.
+
+In practice: schedule the job at the short interval, and let each run exit early when headroom is ample and the last full check is recent.
+
+**Switching is damped.** A box moves its default only when the move pays:
+
+- **Forced moves happen at once:** quota reached, provider down, cap reached, floor not met.
+- **Optional moves** (another free model is a bit faster, for example) require the gain to exceed `{{switch_gain_pct}}`% and hold for two consecutive checks. They also respect the hysteresis and write caps (invariant 37).
+
+Switching on small latency differences buys little, and it costs cache warmth and consistency.
+
+**Limits change on the fly.** An account can move from one allowance to another mid-day (for example, after buying credits). The switcher reads the limit live every check (invariant 42), records the change as an event, recomputes the reserve and the "close" threshold from the new limit, and never keeps an old number. A fixed reserve sized for a small allowance must not persist once the allowance grows, and the reverse.
+
+Invariant 57.
+
 ---
 
 ## §5 — Struggle detection
@@ -2052,6 +2084,7 @@ Set by hand unless noted. Verify on both boxes. **This is the canonical invarian
 54. (R-54) **Spending limits are layered, scoped by name, and never absent** — provider limits are read live; box daily cap, chat window cap, job budget and interactive reserve each name their scope; without an operator cap the switcher runs an adaptive cap: a modest start, recomputed daily from its own spending trend, bounded by any provider limit it can read live, never assuming a dollar figure; an operator-set value pins it (§4.22).
 55. (R-55) **On by default** — test mode ends when verification passes or after a bounded time; off or test mode afterwards only by a recorded operator override; reports state the mode from the running command, not a log line (§4.23).
 56. (R-56) **Daily anonymous sharing, consented once, changed only by the operator** — new installs ask at install (default daily, preview shown, first report reviewed) and record the answer; nothing but the operator's explicit instruction changes it; every contribution uses the naming descriptors and passes validation with the box's deny list; reports wait in a compressed outbox until upload is confirmed (§30.10).
+57. (R-57) **Check by headroom, switch by gain** — checks run often only when a limit is near or projected to run out, and immediately on events; optional switches need a sustained gain above a threshold; a limit change is an event that resets the reserve and thresholds from the new value (§4.24).
 
 ---
 
@@ -2430,6 +2463,7 @@ The failure table is no longer duplicated here. It is the trap-door entries in *
 | Long job nears its budget | Downshift to the cheapest capable lane and notify; pause and ask at the hard limit | §4.21, invariant 51 |
 | Job repeats itself or stops progressing | Pause at a checkpoint immediately and notify | §4.21, invariant 51 |
 | Shared lane busy (a person or the lead is using it) | Guest falls back immediately; lead holds background work | §6.4b, invariant 52 |
+| Provider limit changes mid-day (e.g. credits bought) | Record the event; recompute the reserve and thresholds from the new limit | §4.24, invariant 57 |
 | No spending cap configured | Switcher sets the built-in catch from history and provider limits; reports it | §4.22, invariant 54 |
 | Spend unreadable | Close paid lanes until readable; free and local continue | §4.22, invariant 54 |
 | Free allowance tight, task needs a stronger model | Cheapest capable model by effective cost, which now favors paid | §4.20, invariant 50 |
@@ -3534,6 +3568,7 @@ Each decision is recorded with its reason.
 | v3.11 | v3.10 | Contribution lanes: `contrib/` reports and findings, validator, CI, quorum rule (§30.6). |
 | v3.12 | v3.11 | Adaptive spending cap: start default, daily recompute from trend, provider limits read not assumed, optional ceiling (§4.22). |
 | v3.13 | v3.12 | Daily anonymous sharing by default with install consent (§30.10, invariant 56); naming descriptors and deny list for contributions. |
+| v3.14 | v3.13 | Check by headroom, switch by gain, live limit changes (§4.24, invariant 57). |
 
 ### Record 5 — Anomalies and open items
 
@@ -3664,7 +3699,7 @@ A `doctor` command that outputs the deployment's actual config, chains, owners, 
 
 ## §21 — Document version
 
-**Version:** 3.13
+**Version:** 3.14
 **Last updated:** 2026-10-15
 
 **Companion artifacts:**
@@ -3750,7 +3785,7 @@ If a deployment keeps these, the rule set stays honest. If it drops them, it pro
 
 ---
 
-**End of the guide, v3.13.**
+**End of the guide, v3.14.**
 
 ---
 
@@ -3910,6 +3945,18 @@ numbers:
   contrib_outbox_max_mb:
     description: "outbox size before old dailies are folded into weekly rollups (§30.10)"
     question: "default 20"
+  tick_relaxed_minutes:
+    description: "check interval while headroom is ample (§4.24)"
+    question: "default 30"
+  tick_close_minutes:
+    description: "check interval when a limit is near or projected to run out (§4.24)"
+    question: "default 5"
+  tick_close_pct:
+    description: "remaining share of a limit below which checks speed up (§4.24)"
+    question: "default 25"
+  switch_gain_pct:
+    description: "minimum sustained gain for an optional switch (§4.24)"
+    question: "default 30"
   manual_override_hours:
     description: "how long a manual change pauses the selector before it re-plans"
     question: "default 4; 4–6 recommended. A hold (no expiry) is requested explicitly, not configured here"

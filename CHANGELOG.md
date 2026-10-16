@@ -8,6 +8,14 @@ Version history of `HERMES-MODEL-SWITCHER.md`. The current version is in `VERSIO
 
 ---
 
+## v3.14 — 2026-10-15 — adaptive check cadence, damped switching, live limit changes
+
+- §4.24: the check interval follows headroom (30 minutes when ample; 5 minutes when under 25% remaining or projected to run out at the current burn rate; immediately on 429s, errors, override ends and limit changes). Optional switches need a sustained gain above `switch_gain_pct` over two checks. A mid-day limit change (for example, credits bought) is recorded, and the reserve and thresholds are recomputed from the new limit. Invariant 57.
+
+**Adopters: action required**
+- Replace a fixed tick with headroom-based checking (schedule at the short interval; exit early when headroom is ample).
+- Make sure no reserve or threshold is a fixed number sized for one allowance.
+
 ## v3.13 — 2026-10-15 — daily anonymous sharing; naming descriptors
 
 - §30.10: daily anonymous `report/v1` sharing is the install default. The operator is asked once (preview shown, first report reviewed) and the answer recorded; only the operator changes it. Reports wait in a compressed outbox, roll up weekly past a size limit, and are flushed only after upload is confirmed. Full reports never go public. Invariant 56.

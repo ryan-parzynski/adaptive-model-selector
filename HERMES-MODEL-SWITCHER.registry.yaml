@@ -149,6 +149,18 @@ numbers:
   contrib_outbox_max_mb:
     description: "outbox size before old dailies are folded into weekly rollups (§30.10)"
     question: "default 20"
+  tick_relaxed_minutes:
+    description: "check interval while headroom is ample (§4.24)"
+    question: "default 30"
+  tick_close_minutes:
+    description: "check interval when a limit is near or projected to run out (§4.24)"
+    question: "default 5"
+  tick_close_pct:
+    description: "remaining share of a limit below which checks speed up (§4.24)"
+    question: "default 25"
+  switch_gain_pct:
+    description: "minimum sustained gain for an optional switch (§4.24)"
+    question: "default 30"
   manual_override_hours:
     description: "how long a manual change pauses the selector before it re-plans"
     question: "default 4; 4–6 recommended. A hold (no expiry) is requested explicitly, not configured here"

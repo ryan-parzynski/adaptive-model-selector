@@ -35,7 +35,7 @@ The full list, with section references, is §0 of the specification.
 
 ## What this is
 
-- **A rule set.** Fifty-six numbered invariants, seven failure classes (numbered 1–4 and 6–8), and the
+- **A rule set.** Fifty-seven numbered invariants, seven failure classes (numbered 1–4 and 6–8), and the
   procedures that enforce them.
 - **A specification, not an implementation.** The rules bind to model routing
   policy; where they bind to a specific runtime build, they say so.
@@ -85,7 +85,7 @@ Read it or don't; the rules stand alone.
 
 ## Status
 
-- **Version:** 3.13 (see `VERSION`; history and adopter actions in `CHANGELOG.md`)
+- **Version:** 3.14 (see `VERSION`; history and adopter actions in `CHANGELOG.md`)
 - **Verified:** source-verified against the running stack. The checks in
   `checks/` are tested against fixtures (`checks/tests/run.sh`) but not yet on a
   live Hermes box. Code blocks remaining inside the specification are
