@@ -94,6 +94,10 @@ Read it or don't; the rules stand alone.
   (open items at publication). The specification is honest about what is not
   yet live-run-verified.
 
+## Status
+
+What is proven, piloted or still experimental: see **`STATUS.md`**. The specification is frozen to box-verified fixes for about a week; new ideas go to `proposed/`.
+
 ## Contributing
 
 Discussion in **GitHub Discussions**; concrete bugs and proposals in **GitHub
