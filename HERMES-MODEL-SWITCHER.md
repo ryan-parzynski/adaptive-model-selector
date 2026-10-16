@@ -1,3 +1,18 @@
+# v3.10 — layered spending limits with a built-in catch; on by default
+
+Changes in this pass:
+- **§4.22:** limits in layers, each named by scope:
+  - provider limits, read live;
+  - box daily cap;
+  - chat window cap;
+  - job budget;
+  - interactive reserve.
+
+  Without an operator cap, the switcher sets a catch from its own spending history and any provider period limit. Edge cases are listed. Invariant 54
+- **§4.23:** test mode is bounded; on is the default; off only by a recorded override; the mode is judged from the running command. Invariant 55
+
+---
+
 # v3.9 — shared lanes, lightweight lane sampling
 
 Changes in this pass:
@@ -158,7 +173,7 @@ Changes in this pass:
 
 # Hermes Model Switcher — Operator's Guide
 
-**Version:** 3.9
+**Version:** 3.10
 **Last updated:** 2026-10-15
 **Purpose:** How to keep one or more Hermes boxes switching models safely, audibly, and without the failure modes this guide names.
 **Audience:** Operators of Hermes boxes. Anyone maintaining model routing on a box running the Hermes stack.
@@ -244,6 +259,8 @@ Principles that drive everything below:
 | Long-running jobs: budget, breaker, heartbeat | §4.21 |
 | Shared lanes: lead and guests | §6.4b |
 | Lightweight lane sampling | §30.9 |
+| Spending limits in layers; built-in catch | §4.22 |
+| On by default | §4.23 |
 | Local capability tiers and resource guards | §31 |
 
 ---
@@ -1526,6 +1543,45 @@ The breaker pauses at a checkpoint and notifies; it never retries on its own. A 
 
 Invariant 51.
 
+### 4.22 Spending limits in layers, with a built-in catch
+
+Every limit **names its scope**: "per day, whole box", "per chat window", "per job". A bare "cap" gets misread; for example, a daily box cap mistaken for a per-task allowance.
+
+**The layers**, from outermost:
+
+1. **Provider-side limits** (invariant 36). For example, a credit limit on an API key, or a prepaid balance. These hold even if the box's own logic fails. The switcher **reads them live** where the provider exposes them (limit, used, remaining, reset), and records them each tick (§30.4).
+2. **Box daily cap** (`{{box_daily_cap_usd}}`): all paid providers, all work. Set it generously. It resets at midnight in `{{budget_day_tz}}`, stated explicitly.
+3. **Chat window cap** (`{{session_window_cap_usd}}` per `{{session_window_hours}}` rolling hours, per session), so one conversation can't spend the day's budget.
+4. **Job budget** (§4.21), with the escalation envelope (§4.19) inside it.
+5. **Interactive reserve** (`{{interactive_reserve_pct}}`% of the box daily cap). Background jobs can't use it, so chat keeps working.
+
+**The built-in catch.** When the operator hasn't set a box daily cap, the switcher sets one itself, and says so in its status report. It is the **smaller** of:
+
+- `{{auto_cap_multiple}}` × the median daily paid spend over the last 14 days (with less than 7 days of history, use `{{auto_cap_floor_usd}}`);
+- the pace of any provider-side periodic limit: remaining ÷ days left in its period × `{{auto_cap_multiple}}`.
+
+This protects an operator who forgot a limit, without blocking normal use. A spike above it pauses paid lanes for the rest of the day and alerts.
+
+**Edge cases:**
+
+- **A cap reached mid-turn:** finish the current step on a free or local lane, then pause. Never stop halfway through a tool call or a file write.
+- **A job crossing midnight:** an approved job keeps its approved budget. It draws from the non-reserved part of the new day; if that is exhausted, it pauses at a checkpoint.
+- **What counts:** retries, failed calls, and work delegated to helper agents count against the session or job that started them.
+- **Unknown or conflicting cost:** if the box's own spend count and the provider's figure disagree, use the higher. If spend can't be read at all, paid lanes close (fail closed) until it can; free and local lanes continue.
+- **Human choices still count:** a model the operator picks counts toward the caps. The switcher warns at the soft limit and doesn't silently override the person.
+- **Temporary raises** are typed by the operator, expire at the end of the day or window, and go in the decision ledger.
+- **Shared accounts:** several boxes on one provider account share its limit. Say in §12 whether one box can starve another.
+
+Invariant 54.
+
+### 4.23 On by default
+
+After an install or update, the switcher runs in test mode only until the verification of AGENT-GUIDE §9 passes, or for `{{test_mode_max_hours}}` hours (default 24), whichever comes first. If verification passes, it turns on. If it fails, it stays off and alerts.
+
+After that, **on is the default.** Off or test mode happens only through a recorded operator override: who, when, why, and until when. Each status report states the mode **and what set it**. A log line is never the evidence for the mode; the command that actually runs is (§10.23).
+
+Invariant 55.
+
 ---
 
 ## §5 — Struggle detection
@@ -1966,6 +2022,8 @@ Set by hand unless noted. Verify on both boxes. **This is the canonical invarian
 51. (R-51) **Heavy jobs are bounded by budget, progress, and heartbeat** — each job has a budget with a soft limit (downshift and notify) and a hard limit (pause at a checkpoint and ask); a progress breaker pauses any job that repeats itself or stops progressing, regardless of budget; long jobs emit heartbeats (§4.21).
 52. (R-52) **A shared lane has one lead; guests yield** — only the lead switcher loads or unloads models on a shared lane; guests use loaded models with short timeouts and fall back immediately; a person using the card makes the lane busy; relays run on inference nodes, not hypervisor hosts (§6.4b).
 53. (R-53) **Lanes are sampled lightly, in one schema** — hosts and consumers record lane state and network path every few minutes, with no model calls and no content, in the same fields on every box, so rollups can be pulled together for tuning (§30.9).
+54. (R-54) **Spending limits are layered, scoped by name, and never absent** — provider limits are read live; box daily cap, chat window cap, job budget and interactive reserve each name their scope; without an operator cap the switcher sets one from the box's spending history and any provider period limit, and says so (§4.22).
+55. (R-55) **On by default** — test mode ends when verification passes or after a bounded time; off or test mode afterwards only by a recorded operator override; reports state the mode from the running command, not a log line (§4.23).
 
 ---
 
@@ -2344,6 +2402,8 @@ The failure table is no longer duplicated here. It is the trap-door entries in *
 | Long job nears its budget | Downshift to the cheapest capable lane and notify; pause and ask at the hard limit | §4.21, invariant 51 |
 | Job repeats itself or stops progressing | Pause at a checkpoint immediately and notify | §4.21, invariant 51 |
 | Shared lane busy (a person or the lead is using it) | Guest falls back immediately; lead holds background work | §6.4b, invariant 52 |
+| No spending cap configured | Switcher sets the built-in catch from history and provider limits; reports it | §4.22, invariant 54 |
+| Spend unreadable | Close paid lanes until readable; free and local continue | §4.22, invariant 54 |
 | Free allowance tight, task needs a stronger model | Cheapest capable model by effective cost, which now favors paid | §4.20, invariant 50 |
 
 ---
@@ -2475,6 +2535,8 @@ This is a **priority order**, not a restatement of rules. Each item names the ru
 41. **Set job budgets, the progress breaker, and heartbeats** before running long or heavy background jobs. Invariant 51; §4.21.
 42. **Name a lead for each shared lane** and make other consumers guests. Invariant 52; §6.4b.
 43. **Run the lane sampler** on every box that hosts or consumes a local lane. Invariant 53; §30.9.
+44. **Set the spending layers** (box daily, chat window, interactive reserve) or accept the built-in catch; read provider limits live. Invariant 54; §4.22.
+45. **Confirm the switcher is on**, judging by the command that runs, and record any override. Invariant 55; §4.23.
 
 ---
 
@@ -2579,6 +2641,8 @@ Most of this list is generated from invariants. The rest names a failure mode no
 - Do not let a long job stop silently or run on unchecked; downshift, pause at a checkpoint, and ask (51).
 - Do not load or unload models on a lane you are only a guest on (52).
 - Do not relay inference through a hypervisor host (52).
+- Do not run paid lanes with no spending limit; set the catch (54).
+- Do not trust a log line for whether the switcher is live; read the running command (55).
 
 ---
 
@@ -3422,6 +3486,7 @@ Each decision is recorded with its reason.
 | v3.7 | v3.6.1 | Capability floors and quality-gated escalation (§4.19, invariant 48); agent memory rules (§0.7, invariant 49). |
 | v3.8 | v3.7 | Capability-first model choice (§4.20, invariant 50); long-job budget, progress breaker and heartbeat (§4.21, invariant 51); in-app notices and undecided alert destinations (§0.6). |
 | v3.9 | v3.8 | Shared lanes with one lead and yielding guests (§6.4b, invariant 52); lightweight lane sampling in one schema (§30.9, invariant 53). |
+| v3.10 | v3.9 | Layered spending limits with a built-in catch (§4.22, invariant 54); on by default (§4.23, invariant 55). |
 
 ### Record 5 — Anomalies and open items
 
@@ -3552,7 +3617,7 @@ A `doctor` command that outputs the deployment's actual config, chains, owners, 
 
 ## §21 — Document version
 
-**Version:** 3.9
+**Version:** 3.10
 **Last updated:** 2026-10-15
 
 **Companion artifacts:**
@@ -3638,7 +3703,7 @@ If a deployment keeps these, the rule set stays honest. If it drops them, it pro
 
 ---
 
-**End of the guide, v3.9.**
+**End of the guide, v3.10.**
 
 ---
 
@@ -3766,6 +3831,27 @@ numbers:
   shared_lane_leads:
     description: "for each shared local lane, the switcher that leads it (§6.4b)"
     question: "e.g. gpu-lane-a: switcher on box-a"
+  box_daily_cap_usd:
+    description: "paid spend per day, whole box, all providers and work; unset = built-in catch (§4.22)"
+  budget_day_tz:
+    description: "time zone whose midnight resets daily budgets (§4.22)"
+  session_window_cap_usd:
+    description: "paid spend per chat session per rolling window (§4.22)"
+  session_window_hours:
+    description: "length of the chat window for the session cap (§4.22)"
+    question: "e.g. 4"
+  interactive_reserve_pct:
+    description: "share of the box daily cap background jobs may not use (§4.22)"
+    question: "e.g. 30"
+  auto_cap_multiple:
+    description: "multiple of typical daily spend (or provider-limit pace) for the built-in catch (§4.22)"
+    question: "e.g. 3"
+  auto_cap_floor_usd:
+    description: "built-in catch while there is under a week of history (§4.22)"
+    question: "e.g. 1.00"
+  test_mode_max_hours:
+    description: "longest a switcher stays in test mode after install or update (§4.23)"
+    question: "default 24"
   manual_override_hours:
     description: "how long a manual change pauses the selector before it re-plans"
     question: "default 4; 4–6 recommended. A hold (no expiry) is requested explicitly, not configured here"

@@ -8,6 +8,15 @@ Version history of `HERMES-MODEL-SWITCHER.md`. The current version is in `VERSIO
 
 ---
 
+## v3.10 — 2026-10-15 — layered spending limits with a built-in catch; on by default
+
+- §4.22: provider limits read live; box daily cap, chat window cap, job budget and interactive reserve, each named by scope. Without an operator cap, the switcher sets a catch: the smaller of a multiple of its median daily spend and the pace of any provider period limit. Edge cases are listed (mid-turn, midnight, retries and delegated work, unreadable or conflicting spend, temporary raises, shared accounts). Invariant 54.
+- §4.23: test mode ends when verification passes or after `test_mode_max_hours`; on is the default; off only by a recorded override; reports judge the mode from the running command. Invariant 55.
+
+**Adopters: action required**
+- Set the box daily cap, or confirm the built-in catch is active and reported (questionnaire P13). Read provider key limits live where available.
+- Check what actually decides your switcher's mode; a log line saying "dry-run" is not evidence.
+
 ## v3.9 — 2026-10-15 — shared lanes, lightweight lane sampling
 
 - §6.4b: one lead per shared GPU lane; guests use loaded models only, with short timeouts, and fall back immediately; a person using the card makes the lane busy and is never evicted; relays run on inference nodes, not hypervisor hosts. Invariant 52.
