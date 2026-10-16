@@ -77,6 +77,8 @@ An answer of `unknown` is legitimate. It makes the dependent rules `unknown`, an
 | P3 | Which **work types** are routed (text only, or also image / code / reasoning)? | policy | list | Work-type routing (§4.16) |
 | P8 | Which **capacity-tier triggers** are enabled (explicit request, deep work type, hard failure, background work)? | policy | subset of the four; default all four | §31.3 |
 | P9 | **Capability floors and escalation envelope:** a starting floor per work type, the maximum escalation steps, and the daily paid envelope for escalated runs | policy | `capability_floors`, `escalation_max_steps`, `escalation_daily_budget` | §4.19, invariant 48 |
+| P10 | **Long-job safeguards:** pre-approval threshold, soft-limit percentage, progress-breaker settings, heartbeat interval; and which work types may let their track record change model selection | policy | `job_preapproval_usd`, `job_soft_limit_pct`, `breaker_repeat_n`, `breaker_no_progress_minutes`, `heartbeat_minutes`, `capability_sample_floor`, `exploration_share` | §4.20, §4.21, invariants 50–51 |
+| P11 | **Alert destination:** a push channel (ntfy, a runtime chat channel such as Discord or Telegram), in-app notices, both, or **undecided** for now | policy | — | §0.6 |
 
 **Note on P1.** A manual change is respected, not reverted. The selector writes nothing for the window, then logs the resume, announces it through the alert path if one is verified, and re-plans; it writes only if the current policy still picks a different model. A hold keeps the pause until `switcher resume`. (§4.14a.)
 

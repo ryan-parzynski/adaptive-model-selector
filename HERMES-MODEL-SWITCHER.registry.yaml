@@ -90,6 +90,24 @@ numbers:
   escalation_daily_budget:
     description: "per-work-type daily spend allowed for escalated runs that land on a paid model (§4.19)"
     question: "e.g. a few cents per work type; when spent, escalated output is delivered marked unverified"
+  capability_sample_floor:
+    description: "checked runs of a model for a work type before its track record counts in selection (§4.20)"
+    question: "e.g. 20"
+  exploration_share:
+    description: "share of low-stakes tasks used to try unrated models, on free or local lanes only (§4.20)"
+    question: "e.g. 0.05"
+  job_preapproval_usd:
+    description: "estimated job cost above which a long or heavy job asks before starting (§4.21)"
+  job_soft_limit_pct:
+    description: "share of a job's budget at which it downshifts to the cheapest capable lane and notifies (§4.21)"
+    question: "e.g. 80"
+  breaker_repeat_n:
+    description: "identical tool calls or errors in a row that trip the progress breaker (§4.21)"
+    question: "e.g. 3"
+  breaker_no_progress_minutes:
+    description: "minutes without new progress before the breaker pauses a job (§4.21)"
+  heartbeat_minutes:
+    description: "how often long jobs record progress (§4.21)"
   manual_override_hours:
     description: "how long a manual change pauses the selector before it re-plans"
     question: "default 4; 4–6 recommended. A hold (no expiry) is requested explicitly, not configured here"

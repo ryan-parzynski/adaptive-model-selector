@@ -8,6 +8,17 @@ Version history of `HERMES-MODEL-SWITCHER.md`. The current version is in `VERSIO
 
 ---
 
+## v3.8 — 2026-10-15 — capability-first model choice, long-job safeguards, in-app notices
+
+- §4.20: the switcher filters models by hard requirements, estimates capability from this box's own track record (once enough runs are checked), operator overrides, then conservative priors, and picks the lowest **effective** cost (including the free allowance's shadow price) among models that meet the floor. Unrated models are tried only on low-stakes work, on free or local lanes. Any trigger that needs a stronger model just raises the floor. Invariant 50.
+- §4.21: heavy and long jobs get a per-job budget (soft limit: downshift to the cheapest capable lane and notify; hard limit: pause at a checkpoint and ask), a **progress breaker** that pauses a job repeating itself or making no progress regardless of budget, and **heartbeats**. Invariant 51.
+- §0.6: in-app notices (session banners, task-end notices) are recorded-and-surfaced, not loud; runtime chat channels count once tested; an undecided destination reports like absent.
+
+**Adopters: action required**
+- Before running long or heavy background jobs: set the job pre-approval threshold, soft-limit percentage, breaker settings and heartbeat interval (questionnaire P10). Make sure jobs checkpoint, or state that they can't.
+- Start recording per-model evidence-check results per work type; track records count only after `capability_sample_floor` runs and only where enabled.
+- Record the alert destination decision (questionnaire P11), "undecided" allowed.
+
 ## v3.7 — 2026-10-15 — capability floors, quality-gated escalation, agent memory
 
 - §4.19: escalation raises a task's **capability floor**, never a provider. The switcher's normal logic picks the lane (free while available and above the reserve, then paid-cheapest), so a spent free allowance is handled like any other session. Escalation is bounded by a step limit and a per-work-type daily paid envelope; when the envelope is spent, output is delivered marked "unverified" instead of retried. The trigger is an evidence check on the output (placeholder hashes, VERIFIED without a command, summary/body contradictions, key fragments, unchecked "offline" claims), not the model's opinion of itself. Invariant 48.

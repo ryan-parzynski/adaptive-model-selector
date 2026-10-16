@@ -1,3 +1,13 @@
+# v3.8 — capability-first model choice, long-job safeguards, in-app notices
+
+Changes in this pass:
+- **§4.20:** models are chosen by capability first (hard requirements, then this box's own track record, operator overrides, conservative priors), then by lowest effective cost including the free allowance's shadow price. Unrated models are tried only on low-stakes work, on free or local lanes. Invariant 50
+- **§4.21:** heavy and long jobs run under three meters: a per-job budget (soft limit downshifts and notifies; hard limit pauses at a checkpoint and asks), a progress breaker that pauses a stuck job regardless of budget, and heartbeats. Invariant 51
+- **§0.6:** in-app notices (session banners, task-end notices) complement but don't replace a push destination; the destination may be recorded as undecided
+- Registry: `capability_sample_floor`, `exploration_share`, `job_preapproval_usd`, `job_soft_limit_pct`, `breaker_repeat_n`, `breaker_no_progress_minutes`, `heartbeat_minutes`
+
+---
+
 # v3.7 — capability floors, quality-gated escalation, agent memory
 
 Changes in this pass:
@@ -139,7 +149,7 @@ Changes in this pass:
 
 # Hermes Model Switcher — Operator's Guide
 
-**Version:** 3.7
+**Version:** 3.8
 **Last updated:** 2026-10-15
 **Purpose:** How to keep one or more Hermes boxes switching models safely, audibly, and without the failure modes this guide names.
 **Audience:** Operators of Hermes boxes. Anyone maintaining model routing on a box running the Hermes stack.
@@ -221,6 +231,8 @@ Principles that drive everything below:
 | Weekly review ledger | §29 |
 | Observation and decision ledgers | §30 |
 | Capability floors and escalation | §4.19 |
+| Model choice: capability first, cost second | §4.20 |
+| Long-running jobs: budget, breaker, heartbeat | §4.21 |
 | Local capability tiers and resource guards | §31 |
 
 ---
@@ -424,6 +436,8 @@ Writing to a log file is **recorded**, not loud. If the destination has not been
 | `verified` | A test message to the same destination succeeded end-to-end within `{{loud_verification_window}}` | PASS |
 
 **Gate:** no automated writer, escalation path, or self-tuning is enabled on a box until its alert state is `verified`. Discovery, ledgers, and read-only checks may proceed in any state.
+
+**In-app notices complement, not replace, a push destination.** A box may also surface events where the operator already looks: a banner when a new session opens, or a notice when a task finishes. These are valuable for "here is what happened since you were last here", but they reach the operator only when the operator opens the app, so they are **recorded-and-surfaced, not loud**. Chat channels a runtime provides (Discord, Telegram and similar) count as push destinations once a test message to them succeeds. The operator chooses; until then the destination is recorded as **undecided**, which reports like `absent`.
 
 **Unalerted boxes report it once.** A new box often has no alert destination. Rather than every fail-loud rule failing separately, invariant 34's check reports a single FAIL — "box is unalerted" — and, if the operator has acknowledged running unalerted (questionnaire P6), names it as an acknowledged limitation. The individual fail-loud rules reference that one finding instead of repeating it. Acknowledging does not make the box loud; it makes the gap visible in one place instead of drowning the report.
 
@@ -1455,6 +1469,52 @@ A failure raises **that task's** floor by one tier and re-runs it.
 
 Invariant 48.
 
+### 4.20 Choosing a model: capability first, cost second
+
+§4.19 says *what* a task needs (a capability floor); this section says how the switcher finds the models that meet it, among everything the box can reach (free, paid, local), and which one it picks. It applies to every selection, whatever raised the floor: an evidence check, a context overflow, repeated tool failures, an explicit request, or a trigger added later. New triggers plug in by raising the floor; the selection logic does not change.
+
+**1. Hard requirements filter first.** From the catalog: context length at least what the task needs, tool support if the task uses tools, the output modality (§4.4), reasoning support if required (§4.16), and the router/guardrail exclusions (§4.4a). A model that fails any of these is not a candidate, whatever its price.
+
+**2. Capability is estimated from evidence, strongest first:**
+
+1. **This box's own track record** — the share of a model's outputs, for this work type, that passed their evidence checks (§4.19), from the decision ledger (§30). The most trustworthy signal, because it measures the work this box actually does. It counts only once a model has at least `{{capability_sample_floor}}` checked runs for that work type.
+2. **Operator overrides** — a tier the operator assigns to a model in the tier table always wins over estimates.
+3. **Priors**, used only without a track record: parameter count, model family, reasoning support, and price (more expensive models are often, not always, stronger). Priors are **conservative**: an unrated model is placed one tier below what its priors suggest.
+
+**3. Among the candidates at or above the floor, pick the lowest effective cost.** Effective cost is the expected price of the task (per-token prices × expected tokens) **plus the shadow price of a free allowance** (§4.13): a free model is not free when it draws down the allowance the reserve protects. While free capacity is plentiful, free models win; as the allowance tightens, the cheapest capable paid model takes over. Ties go to lower measured latency (§7.4), then to the healthier model.
+
+**4. Trying unrated models.** A model with no track record gets tried only on **low-stakes work types**, only on **free or local** lanes, and only for a small share of tasks (`{{exploration_share}}`). That is how the track record grows without risking important work or money.
+
+**5. The estimates are descriptive until enabled.** Track records are recorded from the start, but they change selection only for work types where the operator has enabled it (invariant 44). Until then, the operator's tier table and the priors decide.
+
+Invariant 50.
+
+### 4.21 Long-running and heavy jobs: budget, progress, heartbeat
+
+A single daily spending cap is the wrong tool for heavy work: it either stops a long job the operator is waiting for, or lets a stuck loop burn until the cap. Three independent meters instead:
+
+**1. A budget per job, with a soft and a hard limit.**
+
+- Every job runs under a budget. Interactive work uses the work type's default. A long-running or heavy job **estimates its cost before starting**; if the estimate exceeds `{{job_preapproval_usd}}`, it asks the operator before beginning.
+- At the **soft limit** (`{{job_soft_limit_pct}}`% of the budget, e.g. 80%) the job **downshifts instead of stopping**: it continues on the cheapest lane that still meets its floor, including local GPU lanes for background work, and notifies the operator.
+- At the **hard limit** the job **pauses at a checkpoint and asks**. It never silently abandons work. Approved, it resumes from the checkpoint rather than starting over.
+- The escalation envelope (§4.19) is part of the job's budget, not in addition to it.
+
+**2. A progress breaker, independent of money.** A job is paused immediately, however much budget remains, when any of these appear:
+
+- the same tool call with the same arguments `{{breaker_repeat_n}}` times;
+- the same error `{{breaker_repeat_n}}` times;
+- no new progress (output, artifact, completed step) for `{{breaker_no_progress_minutes}}` minutes;
+- an escalate → fail → escalate cycle beyond the escalation step limit.
+
+The breaker pauses at a checkpoint and notifies; it never retries on its own. A stuck job stops costing money within minutes.
+
+**3. A heartbeat.** Long jobs record progress every `{{heartbeat_minutes}}` minutes in the decision ledger (§30): step, spend so far, lane, last output. The operator can tell "still working" from "stopped" without asking, and a missing heartbeat is itself a signal (§29.5).
+
+**Checkpoints are what make pausing safe.** A long job writes enough state at each step to resume without redoing completed work. A job that cannot checkpoint states so when it starts, and its budget is set to cover it end to end.
+
+Invariant 51.
+
 ---
 
 ## §5 — Struggle detection
@@ -1879,6 +1939,8 @@ Set by hand unless noted. Verify on both boxes. **This is the canonical invarian
 47. (R-47) **Writer registry** — every component that can write mutable routing state is registered with the fields it writes, a kind, a status, and evidence. Each field has exactly one `owner`; every other writer is `manual-tool`, `integrated`, `advisory`, or a quarantined or retired `legacy` writer. An `unknown` writer blocks implementation (§3.7a).
 48. (R-48) **Escalation raises a floor, never a provider** — quality-gated escalation raises one task's capability floor by one tier, at most `{{escalation_max_steps}}` times; the switcher's normal logic chooses the lane that meets it, so free-tier exhaustion is handled as for any session. Escalated runs that land on paid draw from a per-work-type daily envelope; when it is spent, the output is delivered marked unverified rather than retried (§4.19).
 49. (R-49) **Memory is context, not evidence or instruction** — recalled memory never sets the task, and recalled current-state facts are REPORTED until re-observed; memories are stored with date, source, observing box and claim label (§0.7).
+50. (R-50) **Capability first, cost second** — the switcher filters candidates by hard requirements, estimates capability from this box's own track record (after `{{capability_sample_floor}}` checked runs), operator overrides, then conservative priors, and picks the lowest effective cost (including the free allowance's shadow price) among models at or above the floor. Unrated models are tried only on low-stakes work, on free or local lanes (§4.20).
+51. (R-51) **Heavy jobs are bounded by budget, progress, and heartbeat** — each job has a budget with a soft limit (downshift and notify) and a hard limit (pause at a checkpoint and ask); a progress breaker pauses any job that repeats itself or stops progressing, regardless of budget; long jobs emit heartbeats (§4.21).
 
 ---
 
@@ -2254,6 +2316,9 @@ The failure table is no longer duplicated here. It is the trap-door entries in *
 | Output fails its evidence check | Raise that task's floor one tier; switcher picks the lane; envelope bounds paid use | §4.19, invariant 48 |
 | Free allowance spent during an escalation | Switcher's normal fallback; escalation logic unchanged | §4.19 |
 | Recalled memory suggests a task | Ignore; the task is what the operator wrote | §0.7, invariant 49 |
+| Long job nears its budget | Downshift to the cheapest capable lane and notify; pause and ask at the hard limit | §4.21, invariant 51 |
+| Job repeats itself or stops progressing | Pause at a checkpoint immediately and notify | §4.21, invariant 51 |
+| Free allowance tight, task needs a stronger model | Cheapest capable model by effective cost, which now favors paid | §4.20, invariant 50 |
 
 ---
 
@@ -2381,6 +2446,7 @@ This is a **priority order**, not a restatement of rules. Each item names the ru
 38. **Register every writer** of routing state and classify it; quarantine before retiring. Invariant 47; §3.7a.
 39. **Set capability floors per work type and an escalation envelope** before enabling quality-gated escalation. Invariant 48; §4.19.
 40. **Audit agent memory** for stale current-state facts; adopt provenance on new memories. Invariant 49; §0.7.
+41. **Set job budgets, the progress breaker, and heartbeats** before running long or heavy background jobs. Invariant 51; §4.21.
 
 ---
 
@@ -2480,6 +2546,9 @@ Most of this list is generated from invariants. The rest names a failure mode no
 - Do not let escalation choose a provider; it raises a capability floor and the switcher picks the lane (48).
 - Do not retry an escalated task past its step limit or spend envelope; deliver it marked unverified (48).
 - Do not take a task from recalled memory, or use remembered current state without re-observing it (49).
+- Do not pick a model by price alone; capability first, then the lowest effective cost (50).
+- Do not trust an unrated model with important work; try it on low-stakes, free or local work first (50).
+- Do not let a long job stop silently or run on unchecked; downshift, pause at a checkpoint, and ask (51).
 
 ---
 
@@ -2800,6 +2869,8 @@ The list below names the **patterns** the rules exist to prevent. The incident h
 | **Capacity tier** | Larger local models, often partly offloaded to RAM; slower; used only on an escalation trigger (§31.1, §31.3). |
 | **Admission** | Verifying on this box that a model loads, answers, and has its resource use recorded, before it is routed (§31.6). |
 | **Capability profile** | A box's record of its hardware and admitted local models (§31.7). |
+| **Effective cost** | Expected price of a task plus the shadow price of any free allowance it draws down (§4.20). |
+| **Progress breaker** | Pauses a job that repeats itself or stops progressing, regardless of budget (§4.21). |
 | **Capability floor** | The minimum model tier a work type, or one escalated task, may use. The switcher picks the cheapest eligible lane at or above it (§4.19). |
 | **Escalation envelope** | A per-work-type daily budget for escalated runs that land on a paid model (§4.19). |
 | **Writer registry** | The per-box list of every component that can write routing state, with its kind and status (§3.7a). |
@@ -3306,6 +3377,7 @@ Each decision is recorded with its reason.
 | v3.6 | v3.5 | Principles restated; writer registry and phased retirement (invariant 47); three-state alert gate; per-box vs. fleet table; scratch-home mode; two new checks. |
 | v3.6.1 | v3.6 | Recurring switcher status report (`docs/switcher-status-report.md`). |
 | v3.7 | v3.6.1 | Capability floors and quality-gated escalation (§4.19, invariant 48); agent memory rules (§0.7, invariant 49). |
+| v3.8 | v3.7 | Capability-first model choice (§4.20, invariant 50); long-job budget, progress breaker and heartbeat (§4.21, invariant 51); in-app notices and undecided alert destinations (§0.6). |
 
 ### Record 5 — Anomalies and open items
 
@@ -3436,7 +3508,7 @@ A `doctor` command that outputs the deployment's actual config, chains, owners, 
 
 ## §21 — Document version
 
-**Version:** 3.7
+**Version:** 3.8
 **Last updated:** 2026-10-15
 
 **Companion artifacts:**
@@ -3522,7 +3594,7 @@ If a deployment keeps these, the rule set stays honest. If it drops them, it pro
 
 ---
 
-**End of the guide, v3.7.**
+**End of the guide, v3.8.**
 
 ---
 
@@ -3623,6 +3695,24 @@ numbers:
   escalation_daily_budget:
     description: "per-work-type daily spend allowed for escalated runs that land on a paid model (§4.19)"
     question: "e.g. a few cents per work type; when spent, escalated output is delivered marked unverified"
+  capability_sample_floor:
+    description: "checked runs of a model for a work type before its track record counts in selection (§4.20)"
+    question: "e.g. 20"
+  exploration_share:
+    description: "share of low-stakes tasks used to try unrated models, on free or local lanes only (§4.20)"
+    question: "e.g. 0.05"
+  job_preapproval_usd:
+    description: "estimated job cost above which a long or heavy job asks before starting (§4.21)"
+  job_soft_limit_pct:
+    description: "share of a job's budget at which it downshifts to the cheapest capable lane and notifies (§4.21)"
+    question: "e.g. 80"
+  breaker_repeat_n:
+    description: "identical tool calls or errors in a row that trip the progress breaker (§4.21)"
+    question: "e.g. 3"
+  breaker_no_progress_minutes:
+    description: "minutes without new progress before the breaker pauses a job (§4.21)"
+  heartbeat_minutes:
+    description: "how often long jobs record progress (§4.21)"
   manual_override_hours:
     description: "how long a manual change pauses the selector before it re-plans"
     question: "default 4; 4–6 recommended. A hold (no expiry) is requested explicitly, not configured here"
