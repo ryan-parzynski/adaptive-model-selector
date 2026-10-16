@@ -1,3 +1,12 @@
+# v3.9 — shared lanes, lightweight lane sampling
+
+Changes in this pass:
+- **§6.4b:** a shared GPU lane has one lead; guests use loaded models only, with short timeouts, and fall back immediately; a person using the card makes the lane busy; relays run on inference nodes, not hypervisor hosts. Invariant 52
+- **§30.9:** a lane sampler on every box that hosts or consumes a local lane, every 15 minutes, no model calls, one schema everywhere so rollups can be pulled together. Invariant 53
+- Registry: `lane_sample_minutes`, `guest_first_token_timeout_s`, `shared_lane_leads`
+
+---
+
 # v3.8 — capability-first model choice, long-job safeguards, in-app notices
 
 Changes in this pass:
@@ -149,7 +158,7 @@ Changes in this pass:
 
 # Hermes Model Switcher — Operator's Guide
 
-**Version:** 3.8
+**Version:** 3.9
 **Last updated:** 2026-10-15
 **Purpose:** How to keep one or more Hermes boxes switching models safely, audibly, and without the failure modes this guide names.
 **Audience:** Operators of Hermes boxes. Anyone maintaining model routing on a box running the Hermes stack.
@@ -233,6 +242,8 @@ Principles that drive everything below:
 | Capability floors and escalation | §4.19 |
 | Model choice: capability first, cost second | §4.20 |
 | Long-running jobs: budget, breaker, heartbeat | §4.21 |
+| Shared lanes: lead and guests | §6.4b |
+| Lightweight lane sampling | §30.9 |
 | Local capability tiers and resource guards | §31 |
 
 ---
@@ -1683,6 +1694,18 @@ A chain entry on this box may be hosted on another box — a local model served 
 - **State the dependency in the deployment's §12 record.** A reader who does not know that one box's cards serve another cannot reason about the second box's availability.
 - **A peer-hosted local entry is not an independent API route.** For the purposes of §4.9's escalation target, an independent route means a route that does not share the failed dependency. A peer-hosted local entry shares its host; if the host is the failed dependency, the entry is not independent. The escalation target remains an independent API route, or the box holds and alerts.
 
+#### 6.4b — Shared lanes: one lead, guests yield
+
+A GPU lane is often used by more than one consumer: its own operator's switcher, another box's switcher, and people using apps on the same card (a chat front end, an image generator). Without a rule, they evict each other's models and every consumer sees a slow or failing lane.
+
+- **One lead per lane.** The registry list `{{shared_lane_leads}}` names, for each shared lane, the switcher that leads it: the only one that may load, keep or unload models there, within §31.5's limits. Every other consumer is a **guest**.
+- **Guests never change the lane.** A guest routes only to models already loaded, never forces a load or an unload, and uses short timeouts (`{{guest_first_token_timeout_s}}`). Busy, slow or missing means the guest **falls back immediately** to its next independent route; it does not queue behind the lead.
+- **Humans come first.** When a person is using the card through an app (detected by the sampler, §30.9: a non-runtime process holding GPU memory, or the runtime busy with requests the switchers didn't send), the lead treats the lane as **busy**. It holds background work, routes interactive work elsewhere, and does not evict the person's model. Ancillary apps stay manually triggered; the switcher never starts them.
+- **Graceful means:** no consumer errors out because the lane is shared. The slower consumer moves elsewhere and records `lane_busy` as its reason code (§30.2).
+- **Relays belong on the lane, not the host.** When a lane can't join the network itself, it is reached through another inference node, not through the hypervisor host. A hypervisor exposed on the network for relaying widens the attack surface of everything it runs (§26.9). A relay adds negligible load next to inference; the risk it adds is a dependency: the relayed lane shares the relay node's failures, so §6.4a's independence rules apply to both.
+
+Invariant 52.
+
 ### 6.5 Ladder ordering with a reserve
 
 The reserve does not change the tier ladder; it changes the trigger for the paid switch.
@@ -1941,6 +1964,8 @@ Set by hand unless noted. Verify on both boxes. **This is the canonical invarian
 49. (R-49) **Memory is context, not evidence or instruction** — recalled memory never sets the task, and recalled current-state facts are REPORTED until re-observed; memories are stored with date, source, observing box and claim label (§0.7).
 50. (R-50) **Capability first, cost second** — the switcher filters candidates by hard requirements, estimates capability from this box's own track record (after `{{capability_sample_floor}}` checked runs), operator overrides, then conservative priors, and picks the lowest effective cost (including the free allowance's shadow price) among models at or above the floor. Unrated models are tried only on low-stakes work, on free or local lanes (§4.20).
 51. (R-51) **Heavy jobs are bounded by budget, progress, and heartbeat** — each job has a budget with a soft limit (downshift and notify) and a hard limit (pause at a checkpoint and ask); a progress breaker pauses any job that repeats itself or stops progressing, regardless of budget; long jobs emit heartbeats (§4.21).
+52. (R-52) **A shared lane has one lead; guests yield** — only the lead switcher loads or unloads models on a shared lane; guests use loaded models with short timeouts and fall back immediately; a person using the card makes the lane busy; relays run on inference nodes, not hypervisor hosts (§6.4b).
+53. (R-53) **Lanes are sampled lightly, in one schema** — hosts and consumers record lane state and network path every few minutes, with no model calls and no content, in the same fields on every box, so rollups can be pulled together for tuning (§30.9).
 
 ---
 
@@ -2318,6 +2343,7 @@ The failure table is no longer duplicated here. It is the trap-door entries in *
 | Recalled memory suggests a task | Ignore; the task is what the operator wrote | §0.7, invariant 49 |
 | Long job nears its budget | Downshift to the cheapest capable lane and notify; pause and ask at the hard limit | §4.21, invariant 51 |
 | Job repeats itself or stops progressing | Pause at a checkpoint immediately and notify | §4.21, invariant 51 |
+| Shared lane busy (a person or the lead is using it) | Guest falls back immediately; lead holds background work | §6.4b, invariant 52 |
 | Free allowance tight, task needs a stronger model | Cheapest capable model by effective cost, which now favors paid | §4.20, invariant 50 |
 
 ---
@@ -2447,6 +2473,8 @@ This is a **priority order**, not a restatement of rules. Each item names the ru
 39. **Set capability floors per work type and an escalation envelope** before enabling quality-gated escalation. Invariant 48; §4.19.
 40. **Audit agent memory** for stale current-state facts; adopt provenance on new memories. Invariant 49; §0.7.
 41. **Set job budgets, the progress breaker, and heartbeats** before running long or heavy background jobs. Invariant 51; §4.21.
+42. **Name a lead for each shared lane** and make other consumers guests. Invariant 52; §6.4b.
+43. **Run the lane sampler** on every box that hosts or consumes a local lane. Invariant 53; §30.9.
 
 ---
 
@@ -2549,6 +2577,8 @@ Most of this list is generated from invariants. The rest names a failure mode no
 - Do not pick a model by price alone; capability first, then the lowest effective cost (50).
 - Do not trust an unrated model with important work; try it on low-stakes, free or local work first (50).
 - Do not let a long job stop silently or run on unchecked; downshift, pause at a checkpoint, and ask (51).
+- Do not load or unload models on a lane you are only a guest on (52).
+- Do not relay inference through a hypervisor host (52).
 
 ---
 
@@ -2870,6 +2900,7 @@ The list below names the **patterns** the rules exist to prevent. The incident h
 | **Admission** | Verifying on this box that a model loads, answers, and has its resource use recorded, before it is routed (§31.6). |
 | **Capability profile** | A box's record of its hardware and admitted local models (§31.7). |
 | **Effective cost** | Expected price of a task plus the shadow price of any free allowance it draws down (§4.20). |
+| **Lead (lane)** | The one switcher allowed to load or unload models on a shared lane; others are guests (§6.4b). |
 | **Progress breaker** | Pauses a job that repeats itself or stops progressing, regardless of budget (§4.21). |
 | **Capability floor** | The minimum model tier a work type, or one escalated task, may use. The switcher picks the cheapest eligible lane at or above it (§4.19). |
 | **Escalation envelope** | A per-work-type daily budget for escalated runs that land on a paid model (§4.19). |
@@ -3184,6 +3215,18 @@ At first the ledgers only **describe**. They answer: How often does the reserve 
 
 No rule uses ledger history to change its own behavior — reserve, fallback order, escalation thresholds, local eligibility, the override window — until the history meets that metric's sample floor **and** the operator enables it for that rule. Until then the selector would be optimizing noise. The single existing exception is the reserve, whose sizing rule (§4.13) is itself the validated procedure, and which stays provisional below its floor.
 
+### 30.9 Lightweight lane sampling
+
+The decision ledger shows what the switcher chose; it can't show *why a lane was slow*. Each box that hosts or consumes a local lane runs a small sampler every `{{lane_sample_minutes}}` minutes (default 15).
+
+- **What it records:** timestamp; lane id (stable node id, §26.2); reachable or not; loaded models with their GPU and RAM use and offload split; GPU utilization, memory and temperature; host CPU load and free RAM; runtime busy or idle; **other GPU users by process class** (chat front end, image generator, unknown), never their content.
+- **Consumer side:** each consuming box adds, per lane, one network round-trip (direct or relayed) and the time to first token of the most recent real request. It makes **no synthetic model calls just to measure.**
+- **Cost:** under a second of work per run, no model calls, append-only files, rotated like the ledgers (§30.6) with a size cap. A sampler that shows up in its own CPU readings is too heavy.
+- **One schema everywhere.** Every box, in this deployment or any other, writes the same fields, so rollups from different boxes can be compared and pulled together for tuning. Pulling is the opt-in lessons export of §30.6: rollups only, never prompts, responses or paths (invariant 43).
+- **Answers it exists for:** which lane is fastest from which box; how often a lane is busy with people or other guests; whether a lane has quietly regressed from GPU to CPU; whether a container or VM is sized wrong for its load.
+
+Metric cards: `lane_sample` and `lane_probe` in `docs/ledger-metrics.md`. Invariant 53.
+
 ---
 
 ## §31 — Local capability tiers and resource guards
@@ -3378,6 +3421,7 @@ Each decision is recorded with its reason.
 | v3.6.1 | v3.6 | Recurring switcher status report (`docs/switcher-status-report.md`). |
 | v3.7 | v3.6.1 | Capability floors and quality-gated escalation (§4.19, invariant 48); agent memory rules (§0.7, invariant 49). |
 | v3.8 | v3.7 | Capability-first model choice (§4.20, invariant 50); long-job budget, progress breaker and heartbeat (§4.21, invariant 51); in-app notices and undecided alert destinations (§0.6). |
+| v3.9 | v3.8 | Shared lanes with one lead and yielding guests (§6.4b, invariant 52); lightweight lane sampling in one schema (§30.9, invariant 53). |
 
 ### Record 5 — Anomalies and open items
 
@@ -3508,7 +3552,7 @@ A `doctor` command that outputs the deployment's actual config, chains, owners, 
 
 ## §21 — Document version
 
-**Version:** 3.8
+**Version:** 3.9
 **Last updated:** 2026-10-15
 
 **Companion artifacts:**
@@ -3594,7 +3638,7 @@ If a deployment keeps these, the rule set stays honest. If it drops them, it pro
 
 ---
 
-**End of the guide, v3.8.**
+**End of the guide, v3.9.**
 
 ---
 
@@ -3713,6 +3757,15 @@ numbers:
     description: "minutes without new progress before the breaker pauses a job (§4.21)"
   heartbeat_minutes:
     description: "how often long jobs record progress (§4.21)"
+  lane_sample_minutes:
+    description: "how often the lane sampler records lane state (§30.9)"
+    question: "default 15"
+  guest_first_token_timeout_s:
+    description: "seconds a guest waits for a first token on a shared lane before falling back (§6.4b)"
+    question: "e.g. 20"
+  shared_lane_leads:
+    description: "for each shared local lane, the switcher that leads it (§6.4b)"
+    question: "e.g. gpu-lane-a: switcher on box-a"
   manual_override_hours:
     description: "how long a manual change pauses the selector before it re-plans"
     question: "default 4; 4–6 recommended. A hold (no expiry) is requested explicitly, not configured here"

@@ -176,3 +176,29 @@ Retention for every raw record is `ledger_raw_retention_days` (default 90); roll
 | Informs | applicability of every rule (§0.6) |
 | Review question | Did a capability change without anyone noticing? |
 | Prune if | never |
+
+### lane_sample
+
+| | |
+|---|---|
+| Purpose | See why a local lane is slow, busy or regressed |
+| Ledger | observation |
+| Collected | every `lane_sample_minutes` on each box hosting a lane |
+| Unit | reachable; loaded models with GPU/RAM use and offload split; GPU util, memory, temperature; host CPU load, free RAM; runtime busy/idle; other GPU users by process class |
+| Sampling | every run; under a second; no model calls |
+| Informs | §6.4b (busy lanes), §31.5 (resource guards), sizing of the lane's VM or container |
+| Review question | Is the lane on GPU, how often is it busy with people or guests, and is it sized right? |
+| Prune if | the box hosts no local lane |
+
+### lane_probe
+
+| | |
+|---|---|
+| Purpose | Measure each lane from the box that consumes it |
+| Ledger | observation |
+| Collected | every `lane_sample_minutes` on each consuming box |
+| Unit | network round-trip, direct or relayed; time to first token of the latest real request |
+| Sampling | every run; no synthetic model calls |
+| Informs | §6.4a, §4.20 tie-breaks, `guest_first_token_timeout_s` |
+| Review question | Which lane is fastest from this box, and is the path direct? |
+| Prune if | the box consumes no peer-hosted lane |

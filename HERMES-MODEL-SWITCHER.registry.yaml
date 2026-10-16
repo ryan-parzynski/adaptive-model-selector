@@ -108,6 +108,15 @@ numbers:
     description: "minutes without new progress before the breaker pauses a job (§4.21)"
   heartbeat_minutes:
     description: "how often long jobs record progress (§4.21)"
+  lane_sample_minutes:
+    description: "how often the lane sampler records lane state (§30.9)"
+    question: "default 15"
+  guest_first_token_timeout_s:
+    description: "seconds a guest waits for a first token on a shared lane before falling back (§6.4b)"
+    question: "e.g. 20"
+  shared_lane_leads:
+    description: "for each shared local lane, the switcher that leads it (§6.4b)"
+    question: "e.g. gpu-lane-a: switcher on box-a"
   manual_override_hours:
     description: "how long a manual change pauses the selector before it re-plans"
     question: "default 4; 4–6 recommended. A hold (no expiry) is requested explicitly, not configured here"

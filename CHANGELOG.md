@@ -8,6 +8,16 @@ Version history of `HERMES-MODEL-SWITCHER.md`. The current version is in `VERSIO
 
 ---
 
+## v3.9 — 2026-10-15 — shared lanes, lightweight lane sampling
+
+- §6.4b: one lead per shared GPU lane; guests use loaded models only, with short timeouts, and fall back immediately; a person using the card makes the lane busy and is never evicted; relays run on inference nodes, not hypervisor hosts. Invariant 52.
+- §30.9: lane sampler on every box hosting or consuming a local lane, default every 15 minutes, no model calls, no content, one schema everywhere so rollups can be pulled together for tuning. Metric cards `lane_sample` and `lane_probe`. Invariant 53.
+
+**Adopters: action required**
+- If any local lane is used by more than one consumer, name its lead in `shared_lane_leads` and set guests' `guest_first_token_timeout_s` (questionnaire P12).
+- Install the lane sampler on each box that hosts or consumes a local lane; check its own cost stays under a second per run.
+- If a lane is relayed through a hypervisor host, plan to move the relay to an inference node.
+
 ## v3.8 — 2026-10-15 — capability-first model choice, long-job safeguards, in-app notices
 
 - §4.20: the switcher filters models by hard requirements, estimates capability from this box's own track record (once enough runs are checked), operator overrides, then conservative priors, and picks the lowest **effective** cost (including the free allowance's shadow price) among models that meet the floor. Unrated models are tried only on low-stakes work, on free or local lanes. Any trigger that needs a stronger model just raises the floor. Invariant 50.
