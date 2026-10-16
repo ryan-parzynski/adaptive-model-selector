@@ -291,15 +291,15 @@ This record is what the update path (guide §5) starts from. Keep it current; it
 
 ### 7.1a Ask about daily sharing (new installs)
 
-Before finishing an install, ask the operator **once** about daily anonymous sharing (spec §30.10):
+Before finishing an install, ask the operator **once** about daily anonymous sharing (spec §30.10). It is **off** until they say yes.
 
 1. Build a preview `report/v1` from this box's own data, following `contrib/NAMING.md`.
-2. Show the preview to the operator, and say that sharing is daily by default.
-3. Record the answer (`daily` or `off`), the date, and who answered in `state/switcher-adoption.yaml`, together with a newly generated random `contributor_id`.
-4. Create `state/contrib-deny.txt` from this box's own names, aliases, lanes, peers, addresses, users and home paths, and the outbox directory.
-5. Hold the first report for the operator to review.
+2. Show the preview, explain what sharing contributes, and recommend yes. Don't pre-select an answer.
+3. Record the answer (`daily` or `off`), the date, and who answered in `state/switcher-adoption.yaml`.
+4. **On yes:** generate a random `contributor_id`; create `state/contrib-deny.txt` (this box's own names, aliases, lanes, peers, addresses, users and home paths) and the outbox directory; hold the first report for review.
+5. **On no:** schedule the reminders (30, 90, 180, 365 days, then yearly) through the box's alert path. Each one offers yes, not now, or don't ask again.
 
-On an **update** or **merge**, don't ask again. Keep the recorded answer, and never change it without the operator's explicit instruction.
+On an **update** or **merge**, keep the recorded answer and its schedule. Never change it without the operator's explicit instruction.
 
 ### 7.2 Start the ledgers early
 

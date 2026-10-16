@@ -39,12 +39,13 @@ Examples: `docs/examples/contrib-report.example.yaml`, `docs/examples/contrib-fi
 
 Names follow `contrib/NAMING.md`: descriptors such as "a relayed peer GPU, 8–16 GB NVIDIA, in a container", never names, addresses or people.
 
-## Daily sharing (the default for new installs)
+## Daily sharing (off by default, asked at install)
 
-A box that adopts the switcher **shares a `report/v1` once a day**, plus any `finding/v1` it has, unless the operator turns sharing off. The rules are in spec §30.10:
+Sharing helps every adopter, so the project recommends it, but each box starts with it **off** (spec §30.10):
 
-- **Asked once, at install.** The installing agent shows the operator what a report contains (a preview built from the box's own data) and asks. The default answer is **daily**. The answer is saved, with the date and who gave it, in `state/switcher-adoption.yaml`.
-- **The first report is held for the operator to review.** After that, reports go out daily on their own.
+- **Asked once, at install.** The installing agent shows the operator a preview of a real report built from the box's own data, explains what it contributes, and recommends saying yes. Nothing is pre-selected. The answer is saved, with the date and who gave it, in `state/switcher-adoption.yaml`.
+- **The first report is held for the operator to review.** After a yes, the first report waits for review; then reports go out daily.
+- **A no gets a gentle, lengthening re-ask:** a one-line reminder through the box's alert path after 30, 90, 180 and 365 days, then yearly. Each reminder offers **yes**, **not now**, or **don't ask again**, which is honored permanently. A box with no alert path doesn't re-ask.
 - **Only the operator changes it.** No agent, update or contribution may turn sharing on or off, or change what is shared, without the operator's explicit, typed instruction. That instruction is recorded.
 - **Outbox:** reports wait in `state/contrib-outbox/` (mirroring the `contrib/` layout: `reports/YYYY-MM/`, `findings/<kind>/YYYY-MM/`) until they're uploaded. The validator accepts the outbox path directly. If an upload fails, they stay and are retried the next day. Files older than a day are compressed. Past the outbox size limit, the oldest daily reports are folded into one weekly rollup rather than dropped. Each file is flushed (deleted from the outbox) only after its upload is **confirmed**: the pull request exists and contains the file.
 

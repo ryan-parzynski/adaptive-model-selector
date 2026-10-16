@@ -141,8 +141,8 @@ numbers:
     description: "longest a switcher stays in test mode after install or update (§4.23)"
     question: "default 24"
   share_reports:
-    description: "daily anonymous report sharing: daily (default at install) or off; changed only by the operator (§30.10)"
-    question: "default daily"
+    description: "daily anonymous report sharing: daily or off; off by default, asked at install; changed only by the operator (§30.10)"
+    question: "default off (asked at install)"
   contrib_outbox_dir:
     description: "where reports wait until upload is confirmed (§30.10)"
     question: "default state/contrib-outbox"
@@ -161,6 +161,9 @@ numbers:
   switch_gain_pct:
     description: "minimum sustained gain for an optional switch (§4.24)"
     question: "default 30"
+  share_reask_days:
+    description: "after a no to sharing: days until each reminder (§30.10)"
+    question: "default [30, 90, 180, 365], then yearly"
   manual_override_hours:
     description: "how long a manual change pauses the selector before it re-plans"
     question: "default 4; 4–6 recommended. A hold (no expiry) is requested explicitly, not configured here"

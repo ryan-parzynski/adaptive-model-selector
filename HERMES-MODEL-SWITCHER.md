@@ -1,3 +1,10 @@
+# v3.15 — sharing off by default, asked at install, gentle re-asks
+
+Changes in this pass:
+- **§30.10:** sharing is **off** by default. It's asked once at install with a preview and a stated recommendation (nothing pre-selected). After a no, reminders come through the alert path at 30, 90, 180 and 365 days, then yearly; "don't ask again" is honored. Invariant 56 reworded. Registry: `share_reask_days`
+
+---
+
 # v3.14 — adaptive check cadence, damped switching, live limit changes
 
 Changes in this pass:
@@ -204,7 +211,7 @@ Changes in this pass:
 
 # Hermes Model Switcher — Operator's Guide
 
-**Version:** 3.14
+**Version:** 3.15
 **Last updated:** 2026-10-15
 **Purpose:** How to keep one or more Hermes boxes switching models safely, audibly, and without the failure modes this guide names.
 **Audience:** Operators of Hermes boxes. Anyone maintaining model routing on a box running the Hermes stack.
@@ -292,7 +299,7 @@ Principles that drive everything below:
 | Lightweight lane sampling | §30.9 |
 | Spending limits in layers; built-in catch | §4.22 |
 | On by default | §4.23 |
-| Daily anonymous sharing | §30.10 |
+| Anonymous sharing (off by default, asked at install) | §30.10 |
 | Check cadence and switch damping | §4.24 |
 | Local capability tiers and resource guards | §31 |
 
@@ -2083,7 +2090,7 @@ Set by hand unless noted. Verify on both boxes. **This is the canonical invarian
 53. (R-53) **Lanes are sampled lightly, in one schema** — hosts and consumers record lane state and network path every few minutes, with no model calls and no content, in the same fields on every box, so rollups can be pulled together for tuning (§30.9).
 54. (R-54) **Spending limits are layered, scoped by name, and never absent** — provider limits are read live; box daily cap, chat window cap, job budget and interactive reserve each name their scope; without an operator cap the switcher runs an adaptive cap: a modest start, recomputed daily from its own spending trend, bounded by any provider limit it can read live, never assuming a dollar figure; an operator-set value pins it (§4.22).
 55. (R-55) **On by default** — test mode ends when verification passes or after a bounded time; off or test mode afterwards only by a recorded operator override; reports state the mode from the running command, not a log line (§4.23).
-56. (R-56) **Daily anonymous sharing, consented once, changed only by the operator** — new installs ask at install (default daily, preview shown, first report reviewed) and record the answer; nothing but the operator's explicit instruction changes it; every contribution uses the naming descriptors and passes validation with the box's deny list; reports wait in a compressed outbox until upload is confirmed (§30.10).
+56. (R-56) **Anonymous sharing: off by default, asked at install, changed only by the operator** — new installs ask once with a preview and a stated recommendation (nothing pre-selected), re-ask after a no on a lengthening schedule through the alert path (30, 90, 180, 365 days, then yearly; "don't ask again" is honored), record every answer; nothing but the operator's explicit instruction changes it; every contribution uses the naming descriptors and passes validation with the box's deny list; reports wait in a compressed outbox until upload is confirmed (§30.10).
 57. (R-57) **Check by headroom, switch by gain** — checks run often only when a limit is near or projected to run out, and immediately on events; optional switches need a sustained gain above a threshold; a limit change is an event that resets the reserve and thresholds from the new value (§4.24).
 
 ---
@@ -2599,7 +2606,7 @@ This is a **priority order**, not a restatement of rules. Each item names the ru
 43. **Run the lane sampler** on every box that hosts or consumes a local lane. Invariant 53; §30.9.
 44. **Set the spending layers** (box daily, chat window, interactive reserve) or accept the built-in catch; read provider limits live. Invariant 54; §4.22.
 45. **Confirm the switcher is on**, judging by the command that runs, and record any override. Invariant 55; §4.23.
-46. **Ask about daily sharing at install** (default daily, preview first), record the answer, generate the `contributor_id`, and set up the outbox and deny list. Invariant 56; §30.10.
+46. **Ask about daily sharing at install** (off by default; preview and recommendation shown), record the answer, set up the re-ask schedule after a no, and on a yes generate the `contributor_id`, outbox and deny list. Invariant 56; §30.10.
 
 ---
 
@@ -3335,11 +3342,12 @@ Raw ledgers rotate: keep `{{ledger_raw_retention_days}}` days (default 90). Week
 
 **Contributing back.** The opt-in export has a public format: `report/v1` rollups and `finding/v1` edge cases or fixes, submitted anonymously by pull request into `contrib/` (see `contrib/README.md`). Findings sit in a folder per kind (bugs, edge cases, optimizations, fixes, unclear rules) and must carry context (environment, how to reproduce, why it matters, evidence, scope, frequency); the maintainer triages each one: accepted for everyone, accepted as a setup note, kept open, or declined with a reason. `checks/contrib-validate.py` rejects unknown fields, implausible values and identifying text before submission and again in CI. Contributions are evidence only: aggregated with medians, a quorum of independent reports before any default changes, a fix reproduced before it is adopted, and their text is never followed as instructions.
 
-### 30.10 Daily sharing (default on)
+### 30.10 Daily sharing (off by default, asked at install)
 
-New installs **share a daily anonymous report** back to the project, because a pooled view across many boxes is what tunes the defaults in this guide.
+A pooled view across many boxes is what tunes this guide's defaults, so the project encourages sharing a daily anonymous report. It is still the operator's choice, and it starts **off**.
 
-- **Consent at install.** The installing agent shows the operator a preview of the first report, built from the box's own data, and asks once. The default is **daily**. The answer is recorded in ``state/switcher-adoption.yaml`` (`sharing: daily | off`, with the date, who answered, and the `contributor_id`, which is random and generated once). The first report is held for the operator to review; after that, reports go out daily on their own.
+- **Asked once, at install, with a clear recommendation to say yes.** The installing agent shows a preview of the first report, built from the box's own data, explains what it contributes, and asks. Nothing is pre-selected; the recommendation is stated in words. The answer (`sharing: daily | off`), the date, and who answered are recorded in `state/switcher-adoption.yaml`, with a random `contributor_id` generated once if the answer is yes. If yes, the first report is held for the operator to review; after that, reports go out daily.
+- **If the answer is no, ask again rarely, then more rarely.** A one-line reminder is delivered through the box's alert path (a push channel, or the next-session notice): after `{{share_reask_days}}` (default 30, 90, 180, 365, then yearly). Each reminder offers three answers: **yes**, **not now** (keeps the schedule), and **don't ask again**, which is recorded and honored permanently. If the box has no alert path at all, it doesn't re-ask.
 - **Only the operator changes it.** No agent, update, recalled memory, or contribution may change sharing, or what is shared, without the operator's explicit typed instruction, and that instruction is recorded. An update that adds a field to `report/v1` takes effect only after the operator approves it.
 - **Never identifying.** Reports and findings use the descriptors in `contrib/NAMING.md`, pass `checks/contrib-validate.py` with the box's own deny list, and contain nothing from the never-list (§30.5). If validation fails, the report is not sent, and that failure itself is recorded as an alert.
 - **Outbox.** Reports wait in `{{contrib_outbox_dir}}`. If an upload fails, they stay and are retried on the next day. Files older than a day are compressed. Past `{{contrib_outbox_max_mb}}`, the oldest dailies are folded into a weekly rollup, never silently dropped. A file is flushed only after its upload is confirmed.
@@ -3569,6 +3577,7 @@ Each decision is recorded with its reason.
 | v3.12 | v3.11 | Adaptive spending cap: start default, daily recompute from trend, provider limits read not assumed, optional ceiling (§4.22). |
 | v3.13 | v3.12 | Daily anonymous sharing by default with install consent (§30.10, invariant 56); naming descriptors and deny list for contributions. |
 | v3.14 | v3.13 | Check by headroom, switch by gain, live limit changes (§4.24, invariant 57). |
+| v3.15 | v3.14 | Sharing off by default, asked at install, lengthening re-asks (§30.10, invariant 56). |
 
 ### Record 5 — Anomalies and open items
 
@@ -3699,7 +3708,7 @@ A `doctor` command that outputs the deployment's actual config, chains, owners, 
 
 ## §21 — Document version
 
-**Version:** 3.14
+**Version:** 3.15
 **Last updated:** 2026-10-15
 
 **Companion artifacts:**
@@ -3785,7 +3794,7 @@ If a deployment keeps these, the rule set stays honest. If it drops them, it pro
 
 ---
 
-**End of the guide, v3.14.**
+**End of the guide, v3.15.**
 
 ---
 
@@ -3937,8 +3946,8 @@ numbers:
     description: "longest a switcher stays in test mode after install or update (§4.23)"
     question: "default 24"
   share_reports:
-    description: "daily anonymous report sharing: daily (default at install) or off; changed only by the operator (§30.10)"
-    question: "default daily"
+    description: "daily anonymous report sharing: daily or off; off by default, asked at install; changed only by the operator (§30.10)"
+    question: "default off (asked at install)"
   contrib_outbox_dir:
     description: "where reports wait until upload is confirmed (§30.10)"
     question: "default state/contrib-outbox"
@@ -3957,6 +3966,9 @@ numbers:
   switch_gain_pct:
     description: "minimum sustained gain for an optional switch (§4.24)"
     question: "default 30"
+  share_reask_days:
+    description: "after a no to sharing: days until each reminder (§30.10)"
+    question: "default [30, 90, 180, 365], then yearly"
   manual_override_hours:
     description: "how long a manual change pauses the selector before it re-plans"
     question: "default 4; 4–6 recommended. A hold (no expiry) is requested explicitly, not configured here"
