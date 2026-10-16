@@ -297,6 +297,8 @@ Even before any selector exists, recording observations (§30) starts the eviden
 
 If the operator runs several boxes, or wants to contribute back, share a **sanitized lessons summary**: what failed, what the rule was, what changed. Never share raw ledgers or reports (§30.6, §22). Rules that turn out wrong for a real deployment are the most valuable input this project can receive; open a GitHub Discussion or Issue.
 
+**Submitting back** (only with the operator's typed approval): write one `report/v1` or `finding/v1` file as `contrib/README.md` describes, run `checks/contrib-validate.py` on it, show it to the operator, then open a pull request from a fork that touches only that file. A pull request is public once opened, so validate first.
+
 ---
 
 ## 8. Never

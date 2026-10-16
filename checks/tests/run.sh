@@ -162,5 +162,22 @@ else
   echo "SKIP probe tests: jq and curl required"
 fi
 
+# ---------- contrib-validate.py
+CV="$T/repo/contrib"; mkdir -p "$CV/reports/2026-10" "$CV/findings/2026-10"
+cp "$C/../docs/examples/contrib-report.example.yaml" "$CV/reports/2026-10/a1b2c3d4.yaml"
+cp "$C/../docs/examples/contrib-finding.example.yaml" "$CV/findings/2026-10/0f0e0d0c.yaml"
+expect 0 "contrib: example report valid" -- python3 "$C/contrib-validate.py" "$CV/reports/2026-10/a1b2c3d4.yaml"
+expect 0 "contrib: example finding valid" -- python3 "$C/contrib-validate.py" "$CV/findings/2026-10/0f0e0d0c.yaml"
+sed 's/lane_busy_rate: 0.04/lane_busy_rate: 7/' "$CV/reports/2026-10/a1b2c3d4.yaml" > "$CV/reports/2026-10/bbbbbbbb.yaml"
+expect 1 "contrib: rate out of range" -- python3 "$C/contrib-validate.py" "$CV/reports/2026-10/bbbbbbbb.yaml"
+printf 'secret_field: 1\n' >> "$CV/reports/2026-10/a1b2c3d4.yaml"
+expect 1 "contrib: unknown field" -- python3 "$C/contrib-validate.py" "$CV/reports/2026-10/a1b2c3d4.yaml"
+sed 's/Repeated 3 times./Seen on 10.0.0.5./' "$CV/findings/2026-10/0f0e0d0c.yaml" > "$CV/findings/2026-10/cccccccc.yaml"
+expect 1 "contrib: identifying text" -- python3 "$C/contrib-validate.py" "$CV/findings/2026-10/cccccccc.yaml"
+cp "$C/../docs/examples/contrib-finding.example.yaml" "$CV/findings/2026-10/not-hex.yaml"
+expect 1 "contrib: bad file name" -- python3 "$C/contrib-validate.py" "$CV/findings/2026-10/not-hex.yaml"
+expect 2 "contrib: missing file" -- python3 "$C/contrib-validate.py" "$CV/findings/2026-10/dddddddd.yaml"
+expect 2 "contrib: no arguments" -- python3 "$C/contrib-validate.py"
+
 echo; echo "$PASS passed, $FAILS failed"
 [ "$FAILS" -eq 0 ]

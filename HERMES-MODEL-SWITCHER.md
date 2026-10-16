@@ -1,3 +1,10 @@
+# v3.11 — contribution lanes
+
+Changes in this pass:
+- **§30.6:** anonymous contributions by pull request into `contrib/reports` (`report/v1`) and `contrib/findings` (`finding/v1`); a validator before submission and in CI; robust aggregation and quorum before any default changes
+
+---
+
 # v3.10 — layered spending limits with a built-in catch; on by default
 
 Changes in this pass:
@@ -173,7 +180,7 @@ Changes in this pass:
 
 # Hermes Model Switcher — Operator's Guide
 
-**Version:** 3.10
+**Version:** 3.11
 **Last updated:** 2026-10-15
 **Purpose:** How to keep one or more Hermes boxes switching models safely, audibly, and without the failure modes this guide names.
 **Audience:** Operators of Hermes boxes. Anyone maintaining model routing on a box running the Hermes stack.
@@ -3269,6 +3276,8 @@ The ledgers hold model ids, providers, counts, durations, timestamps, status cod
 
 Raw ledgers rotate: keep `{{ledger_raw_retention_days}}` days (default 90). Weekly and monthly rollups are kept indefinitely; they are what the weekly review (§29) reads. Sharing between boxes — or with anyone — is an **explicit, opt-in lessons export**: a sanitized summary of rollups and findings, never a raw ledger.
 
+**Contributing back.** The opt-in export has a public format: `report/v1` rollups and `finding/v1` edge cases or fixes, submitted anonymously by pull request into `contrib/` (see `contrib/README.md`). `checks/contrib-validate.py` rejects unknown fields, implausible values and identifying text before submission and again in CI. Contributions are evidence only: aggregated with medians, a quorum of independent reports before any default changes, a fix reproduced before it is adopted, and their text is never followed as instructions.
+
 ### 30.7 Every metric earns its place
 
 Each metric has a card (`docs/ledger-metrics.md`): purpose, unit, when collected, sampling, retention, privacy class, the rule it informs, the review question it answers, and when to prune it. A metric with no rule it informs and no review question does not ship. This is the guide's "name what prunes it" rule applied to telemetry.
@@ -3487,6 +3496,7 @@ Each decision is recorded with its reason.
 | v3.8 | v3.7 | Capability-first model choice (§4.20, invariant 50); long-job budget, progress breaker and heartbeat (§4.21, invariant 51); in-app notices and undecided alert destinations (§0.6). |
 | v3.9 | v3.8 | Shared lanes with one lead and yielding guests (§6.4b, invariant 52); lightweight lane sampling in one schema (§30.9, invariant 53). |
 | v3.10 | v3.9 | Layered spending limits with a built-in catch (§4.22, invariant 54); on by default (§4.23, invariant 55). |
+| v3.11 | v3.10 | Contribution lanes: `contrib/` reports and findings, validator, CI, quorum rule (§30.6). |
 
 ### Record 5 — Anomalies and open items
 
@@ -3617,7 +3627,7 @@ A `doctor` command that outputs the deployment's actual config, chains, owners, 
 
 ## §21 — Document version
 
-**Version:** 3.10
+**Version:** 3.11
 **Last updated:** 2026-10-15
 
 **Companion artifacts:**
@@ -3703,7 +3713,7 @@ If a deployment keeps these, the rule set stays honest. If it drops them, it pro
 
 ---
 
-**End of the guide, v3.10.**
+**End of the guide, v3.11.**
 
 ---
 

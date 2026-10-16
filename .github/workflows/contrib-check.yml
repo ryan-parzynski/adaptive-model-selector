@@ -1,0 +1,24 @@
+name: contrib-check
+on:
+  pull_request:          # not pull_request_target: fork PRs run without repository secrets
+    paths: ["contrib/**"]
+permissions:
+  contents: read
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with: { fetch-depth: 0 }
+      - name: Only contrib files, exactly one
+        run: |
+          files=$(git diff --name-only "origin/${{ github.base_ref }}"...HEAD)
+          echo "$files"
+          outside=$(echo "$files" | grep -v '^contrib/' || true)
+          [ -z "$outside" ] || { echo "Contribution PRs may only touch contrib/: $outside"; exit 1; }
+          n=$(echo "$files" | grep -c '^contrib/.*\.yaml$' || true)
+          [ "$n" -eq 1 ] || { echo "Exactly one contribution file per PR (found $n)"; exit 1; }
+      - name: Validate
+        run: |
+          pip install pyyaml
+          python3 checks/contrib-validate.py $(git diff --name-only "origin/${{ github.base_ref }}"...HEAD | grep '^contrib/.*\.yaml$')

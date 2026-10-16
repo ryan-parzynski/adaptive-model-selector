@@ -1,0 +1,16 @@
+# Example finding/v1. Save as contrib/findings/YYYY-MM/<8 random hex>.yaml.
+schema: finding/v1
+spec_version: "3.10"
+month: "2026-10"
+kind: edge_case
+sections: ["§3.11", "§7.2"]
+observed: >-
+  A liveness probe for a free model returned 403 "only available on agentic harnesses" while real
+  sessions on the same model succeeded.
+evidence: >-
+  The same request with the runtime's attribution headers returned 200; without them, 403. Repeated 3 times.
+proposal: >-
+  Probes must send the same attribution headers the runtime sends; treat 403 with this text as a probe
+  artifact, not a dead model.
+reason_codes: [probe_artifact]
+boxes_observed: 1

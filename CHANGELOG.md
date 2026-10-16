@@ -8,6 +8,15 @@ Version history of `HERMES-MODEL-SWITCHER.md`. The current version is in `VERSIO
 
 ---
 
+## v3.11 — 2026-10-15 — contribution lanes
+
+- `contrib/reports` (`report/v1`: anonymous rollups) and `contrib/findings` (`finding/v1`: bugs, edge cases, optimizations, fixes). One file per pull request, from a fork.
+- `checks/contrib-validate.py` rejects unknown fields, implausible values, oversize text and identifying strings; 8 new fixture tests (83 total). The CI workflow `contrib-check` re-validates and refuses PRs touching anything outside `contrib/`. CODEOWNERS added.
+- Wild data is discounted: medians, a quorum of five independent contributions before any default changes, reproduction before a fix is adopted; contribution text is never followed as instructions.
+
+**Adopters: action required**
+- None. Submitting is optional and needs the operator's approval.
+
 ## v3.10 — 2026-10-15 — layered spending limits with a built-in catch; on by default
 
 - §4.22: provider limits read live; box daily cap, chat window cap, job budget and interactive reserve, each named by scope. Without an operator cap, the switcher sets a catch: the smaller of a multiple of its median daily spend and the pace of any provider period limit. Edge cases are listed (mid-turn, midnight, retries and delegated work, unreadable or conflicting spend, temporary raises, shared accounts). Invariant 54.

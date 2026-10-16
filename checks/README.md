@@ -14,6 +14,7 @@ Tested versions of the checks the specification describes. Each exits **0 pass, 
 | `no-secrets-on-argv.sh` | §10.27 | No script puts a secret on a command line | No |
 | `writer-registry.py` | §3.7a | Every writer of routing state registered and classified; exactly one active owner per field; no `unknown` kinds; legacy writers not active | No |
 | `scratch-preflight.sh` | §10.36 | A scratch Hermes home is isolated from the live one (paths, links, scheduler, ports, provider endpoints) before any write-test | No |
+| `contrib-validate.py` | §30.6 | A community report or finding: path, schema, allowed fields only, plausible ranges, no identifying text | No |
 | `probe.sh` | §3.11, §7.2 | Liveness that asserts on answer **content**; distinguishes a too-small probe budget from a broken model | Spends one request |
 
 Inputs are environment variables, named at the top of each file, and map to registry keys. Nothing reads a hardcoded path; `HERMES_HOME` must be set, resolved from the runtime (§1.3).

@@ -1,0 +1,23 @@
+# Example report/v1. Save as contrib/reports/YYYY-MM/<8 random hex>.yaml (e.g. `openssl rand -hex 4`).
+schema: report/v1
+spec_version: "3.10"
+month: "2026-10"
+period_days: 7
+box:
+  gpu_class: "8-16GB"
+  cpu_cores: "17-32"
+  ram_gb: "65-128"
+  local_lanes: 2
+  peer_lanes: 1
+  providers: [openrouter, deepseek]
+rollups:
+  switches_per_day: 6.5
+  switches_by_reason: {reserve_reached: 12, free_budget_restored: 11, lane_busy: 4}
+  fallback_shared_dependency_rate: 0.0
+  free_requests_per_session_p95: 38
+  first_token_ms_p50: {local_gpu: 1900, peer_gpu: 2600, api_free: 1400, api_paid: 900}
+  lane_busy_rate: 0.04
+  paid_usd_per_day_p50: 0.31
+  limit_hits: {box_daily: 0, breaker: 1}
+models:
+  - {id: "deepseek/deepseek-v4-flash", work_type: report, checked_runs: 41, pass_rate: 0.93}
