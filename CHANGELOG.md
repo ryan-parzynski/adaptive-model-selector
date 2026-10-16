@@ -8,6 +8,14 @@ Version history of `HERMES-MODEL-SWITCHER.md`. The current version is in `VERSIO
 
 ---
 
+## v3.12 — 2026-10-15 — adaptive spending cap
+
+- §4.22: without an operator cap, the cap adapts. It starts at `auto_cap_start_usd` and is recomputed once a day as `auto_cap_multiple` × the 14-day median spend, with that start value as its minimum. It is bounded by an optional `auto_cap_max_usd` and by any provider periodic limit **read live**; no provider figure or dollar amount is assumed. Every recomputation is logged; an operator-set value pins it.
+- Registry: `auto_cap_floor_usd` is replaced by `auto_cap_start_usd` and `auto_cap_max_usd`.
+
+**Adopters: action required**
+- If you implemented the v3.10 catch: recompute it at the daily reset, log each change, and rename the floor key to `auto_cap_start_usd`.
+
 ## v3.11 — 2026-10-15 — contribution lanes
 
 - `contrib/reports` (`report/v1`: anonymous rollups) and `contrib/findings/<kind>/` (`finding/v1`) with folders `bugs`, `edge-cases`, `optimizations`, `fixes`, `unclear-rules`. A finding must include context: environment, how to reproduce, why it matters, evidence, scope and frequency; one-liners are rejected. Triage outcomes: accepted for everyone, accepted as a setup note, kept open, declined with a reason. One file per pull request, from a fork.

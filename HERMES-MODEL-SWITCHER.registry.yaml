@@ -132,9 +132,11 @@ numbers:
   auto_cap_multiple:
     description: "multiple of typical daily spend (or provider-limit pace) for the built-in catch (§4.22)"
     question: "e.g. 3"
-  auto_cap_floor_usd:
-    description: "built-in catch while there is under a week of history (§4.22)"
-    question: "e.g. 1.00"
+  auto_cap_start_usd:
+    description: "adaptive cap's starting value and minimum, until a week of history exists (§4.22)"
+    question: "default 1.00"
+  auto_cap_max_usd:
+    description: "optional ceiling the adaptive cap never exceeds; unset = no ceiling beyond provider limits (§4.22)"
   test_mode_max_hours:
     description: "longest a switcher stays in test mode after install or update (§4.23)"
     question: "default 24"

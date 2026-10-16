@@ -1,3 +1,10 @@
+# v3.12 — adaptive spending cap
+
+Changes in this pass:
+- **§4.22:** the built-in catch becomes an **adaptive cap**. It starts at a modest default, is recomputed once a day from the box's own 14-day median spend, is bounded by any provider limit read live (never assumed), and has an optional ceiling. Each recomputation is logged; an operator-set value pins it. Registry: `auto_cap_start_usd`, `auto_cap_max_usd` (replacing `auto_cap_floor_usd`)
+
+---
+
 # v3.11 — contribution lanes
 
 Changes in this pass:
@@ -180,7 +187,7 @@ Changes in this pass:
 
 # Hermes Model Switcher — Operator's Guide
 
-**Version:** 3.11
+**Version:** 3.12
 **Last updated:** 2026-10-15
 **Purpose:** How to keep one or more Hermes boxes switching models safely, audibly, and without the failure modes this guide names.
 **Audience:** Operators of Hermes boxes. Anyone maintaining model routing on a box running the Hermes stack.
@@ -1562,12 +1569,15 @@ Every limit **names its scope**: "per day, whole box", "per chat window", "per j
 4. **Job budget** (§4.21), with the escalation envelope (§4.19) inside it.
 5. **Interactive reserve** (`{{interactive_reserve_pct}}`% of the box daily cap). Background jobs can't use it, so chat keeps working.
 
-**The built-in catch.** When the operator hasn't set a box daily cap, the switcher sets one itself, and says so in its status report. It is the **smaller** of:
+**The adaptive cap (default).** Unless the operator sets a box daily cap explicitly, the switcher manages one itself and says so in its status report. Boxes differ widely, from light use to heavy, so **no provider figure or dollar amount is assumed.** The cap starts from a modest default and then follows the box's own trend:
 
-- `{{auto_cap_multiple}}` × the median daily paid spend over the last 14 days (with less than 7 days of history, use `{{auto_cap_floor_usd}}`);
-- the pace of any provider-side periodic limit: remaining ÷ days left in its period × `{{auto_cap_multiple}}`.
+- **Start:** `{{auto_cap_start_usd}}` per day, until there are 7 days of history.
+- **Recompute once a day**, at the daily reset (never mid-day): `{{auto_cap_multiple}}` × the median daily paid spend over the last 14 days. It is never below `{{auto_cap_start_usd}}`, and never above `{{auto_cap_max_usd}}` if the operator set that ceiling. The median keeps one heavy day from moving it much; the multiple leaves room for a busy day.
+- **Provider limits are read, never assumed.** If the provider reports a periodic limit live (for example, a monthly credit limit on the key), the cap is also kept at or below that limit's pace: remaining ÷ days left in the period × `{{auto_cap_multiple}}`. If none is reported, this term doesn't apply.
+- **Every recomputation is logged**: the old and new value and the inputs, in the decision ledger. The trend is visible, and a creeping cap is noticed in review.
+- **An operator-set value pins the cap.** It doesn't adapt until the operator removes it.
 
-This protects an operator who forgot a limit, without blocking normal use. A spike above it pauses paid lanes for the rest of the day and alerts.
+A day that hits the cap pauses paid lanes for the rest of that day and alerts. It also counts in the trend: a box that keeps hitting its cap is doing more work, and the cap rises the next day within its bounds. The alert lets the operator decide whether that's wanted.
 
 **Edge cases:**
 
@@ -2029,7 +2039,7 @@ Set by hand unless noted. Verify on both boxes. **This is the canonical invarian
 51. (R-51) **Heavy jobs are bounded by budget, progress, and heartbeat** — each job has a budget with a soft limit (downshift and notify) and a hard limit (pause at a checkpoint and ask); a progress breaker pauses any job that repeats itself or stops progressing, regardless of budget; long jobs emit heartbeats (§4.21).
 52. (R-52) **A shared lane has one lead; guests yield** — only the lead switcher loads or unloads models on a shared lane; guests use loaded models with short timeouts and fall back immediately; a person using the card makes the lane busy; relays run on inference nodes, not hypervisor hosts (§6.4b).
 53. (R-53) **Lanes are sampled lightly, in one schema** — hosts and consumers record lane state and network path every few minutes, with no model calls and no content, in the same fields on every box, so rollups can be pulled together for tuning (§30.9).
-54. (R-54) **Spending limits are layered, scoped by name, and never absent** — provider limits are read live; box daily cap, chat window cap, job budget and interactive reserve each name their scope; without an operator cap the switcher sets one from the box's spending history and any provider period limit, and says so (§4.22).
+54. (R-54) **Spending limits are layered, scoped by name, and never absent** — provider limits are read live; box daily cap, chat window cap, job budget and interactive reserve each name their scope; without an operator cap the switcher runs an adaptive cap: a modest start, recomputed daily from its own spending trend, bounded by any provider limit it can read live, never assuming a dollar figure; an operator-set value pins it (§4.22).
 55. (R-55) **On by default** — test mode ends when verification passes or after a bounded time; off or test mode afterwards only by a recorded operator override; reports state the mode from the running command, not a log line (§4.23).
 
 ---
@@ -3497,6 +3507,7 @@ Each decision is recorded with its reason.
 | v3.9 | v3.8 | Shared lanes with one lead and yielding guests (§6.4b, invariant 52); lightweight lane sampling in one schema (§30.9, invariant 53). |
 | v3.10 | v3.9 | Layered spending limits with a built-in catch (§4.22, invariant 54); on by default (§4.23, invariant 55). |
 | v3.11 | v3.10 | Contribution lanes: `contrib/` reports and findings, validator, CI, quorum rule (§30.6). |
+| v3.12 | v3.11 | Adaptive spending cap: start default, daily recompute from trend, provider limits read not assumed, optional ceiling (§4.22). |
 
 ### Record 5 — Anomalies and open items
 
@@ -3627,7 +3638,7 @@ A `doctor` command that outputs the deployment's actual config, chains, owners, 
 
 ## §21 — Document version
 
-**Version:** 3.11
+**Version:** 3.12
 **Last updated:** 2026-10-15
 
 **Companion artifacts:**
@@ -3713,7 +3724,7 @@ If a deployment keeps these, the rule set stays honest. If it drops them, it pro
 
 ---
 
-**End of the guide, v3.11.**
+**End of the guide, v3.12.**
 
 ---
 
@@ -3856,9 +3867,11 @@ numbers:
   auto_cap_multiple:
     description: "multiple of typical daily spend (or provider-limit pace) for the built-in catch (§4.22)"
     question: "e.g. 3"
-  auto_cap_floor_usd:
-    description: "built-in catch while there is under a week of history (§4.22)"
-    question: "e.g. 1.00"
+  auto_cap_start_usd:
+    description: "adaptive cap's starting value and minimum, until a week of history exists (§4.22)"
+    question: "default 1.00"
+  auto_cap_max_usd:
+    description: "optional ceiling the adaptive cap never exceeds; unset = no ceiling beyond provider limits (§4.22)"
   test_mode_max_hours:
     description: "longest a switcher stays in test mode after install or update (§4.23)"
     question: "default 24"
