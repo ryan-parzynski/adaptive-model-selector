@@ -1,3 +1,12 @@
+# v3.7 — capability floors, quality-gated escalation, agent memory
+
+Changes in this pass:
+- **§4.19 capability floors and quality-gated escalation:** escalation raises one task's capability floor; the switcher's normal logic picks the lane (free while available, then paid-cheapest), so free-tier exhaustion is handled like any session; a per-work-type escalation envelope and a step limit bound paid use; a failed envelope delivers output marked unverified instead of retrying. Invariant 48
+- **§0.7 agent memory:** recalled memory is context, never a task; current-state memories are REPORTED until re-observed; memories carry provenance. Invariant 49
+- Registry: `capability_floors`, `escalation_max_steps`, `escalation_daily_budget`
+
+---
+
 # v3.6.1 — recurring status report
 
 Changes in this pass:
@@ -130,7 +139,7 @@ Changes in this pass:
 
 # Hermes Model Switcher — Operator's Guide
 
-**Version:** 3.6.1
+**Version:** 3.7
 **Last updated:** 2026-10-15
 **Purpose:** How to keep one or more Hermes boxes switching models safely, audibly, and without the failure modes this guide names.
 **Audience:** Operators of Hermes boxes. Anyone maintaining model routing on a box running the Hermes stack.
@@ -196,6 +205,7 @@ Principles that drive everything below:
 | Concern | Section |
 |---|---|
 | Principles | §0 |
+| Agent memory | §0.7 |
 | Failure classes | §0.5 |
 | Claim discipline and "loud" | §0.6 |
 | Environment, switch mechanisms, trap doors | §1–§3 |
@@ -210,6 +220,7 @@ Principles that drive everything below:
 | Parameter structure | §28 |
 | Weekly review ledger | §29 |
 | Observation and decision ledgers | §30 |
+| Capability floors and escalation | §4.19 |
 | Local capability tiers and resource guards | §31 |
 
 ---
@@ -417,6 +428,19 @@ Writing to a log file is **recorded**, not loud. If the destination has not been
 **Unalerted boxes report it once.** A new box often has no alert destination. Rather than every fail-loud rule failing separately, invariant 34's check reports a single FAIL — "box is unalerted" — and, if the operator has acknowledged running unalerted (questionnaire P6), names it as an acknowledged limitation. The individual fail-loud rules reference that one finding instead of repeating it. Acknowledging does not make the box loud; it makes the gap visible in one place instead of drowning the report.
 
 **A rule that says "fail loud" is met only when delivery is loud per the definition above.** The phrase "fail loud" in this guide always means "log *and* deliver loudly"; a deployment with no verified destination has no rule that can be met, and the check's result is FAIL, not PASS.
+
+---
+
+## §0.7 — Agent memory
+
+Agents that keep memory across sessions improve over time, but memory carries errors forward as readily as lessons. In one deployment, a wrong context length, a lane wrongly marked offline, and a mislabelled endpoint spread between sessions and boxes through memory. In another, recalled memories about an unrelated project were taken as the task itself.
+
+- **Recalled memory is context, never a task.** The task is only what the operator wrote. Never infer a question, a task, or a next step from a recalled memory; if recall surfaces something unrelated, ignore it and say so.
+- **Durable lessons may be recalled; perishable state may not.** Procedures and reasons ("measure a lane from the box that consumes it") can be used from memory. Current state (addresses, ports, loaded models, limits, chain order, defaults) is **REPORTED** until re-observed in this session.
+- **Store memories with provenance:** what, when (UTC), how (the command or file), which box observed it, and OBSERVED / REPORTED / HYPOTHESIS. Another agent's claim is stored as theirs, not as your observation.
+- **When memory and observation disagree, trust the observation,** update the memory, and say so.
+
+Invariant 49.
 
 ---
 
@@ -1398,6 +1422,39 @@ Equivalently, when `E[D_local] > E[A]`: local wins when `θ < θ* = c·(1 − p(
 
 **Falls-through-on-timeout is a fact about the runtime, not a rule.** Verify on the running build (§10.28) before assuming. Where the runtime falls through, the inequality applies as written. Where it does not, the API head is the correct default for any chain with non-zero θ.
 
+### 4.19 Capability floors and quality-gated escalation
+
+Some work needs a stronger model than other work: an audit or a migration plan more than a title. And a weak model doing evidence-heavy work produces confident, wrong output, such as placeholder hashes, claims without commands, or summaries that contradict their own body. This section raises the model **for that task only** when the output shows it was too weak, without handing the decision of *where* to get the model to anyone but the switcher.
+
+**Two decisions, two owners.**
+
+- **The capability floor (what the task needs)** is set per work type, and raised by escalation.
+- **The lane (where to get it)** is always chosen by the switcher's normal logic: the cheapest eligible model at or above the floor. That means free while the free allowance is available and above the reserve (§4.13), otherwise paid-cheapest at that capability, under the usual failure-class rules (§4.9).
+
+**Escalation never names a provider or a tier of payment.** It says "this task needs at least tier N+1", never "use paid" or "use free". So when the free allowance is spent or unavailable, escalated work falls back exactly as every other session does, with no separate logic to drift out of step.
+
+**Floors by work type.** The operator sets a starting floor per work type (`{{capability_floors}}`). For example, audits, status reports, migration plans, and anything that will change configuration start at the mid tier; titles and approvals at the smallest. Unlisted work types use the switcher's default ladder.
+
+**The trigger is a verifier, not the model's opinion of itself** (§5.1 S3). An evidence check runs on the finished output of work types that have one. A report fails when:
+
+- it contains placeholder hashes or obviously synthetic identifiers;
+- an item is marked VERIFIED with no command or source;
+- its summary contradicts its body (for example, spend $0 in the summary against a figure in the text);
+- it includes key fragments;
+- it declares a lane offline without checking that lane's current tailnet address.
+
+A failure raises **that task's** floor by one tier and re-runs it.
+
+**Bounds, so escalation cannot burn the budget:**
+
+- at most `{{escalation_max_steps}}` escalations per task (default 2);
+- a per-work-type daily **escalation envelope** (`{{escalation_daily_budget}}`) for escalated runs that land on a paid model. When the envelope is spent, the task is not retried. It is delivered marked **"unverified: escalation budget exhausted"**, with the failed checks listed, and the operator is told.
+- the floor resets after the task. A run of failures does not permanently move a work type up a tier; changing a starting floor is an operator decision.
+
+**Record every escalation** in the decision ledger (§30): the work type, the failed checks, the old and new floor, the lane chosen, the cost, and whether the re-run passed. That history is what tells the operator whether a work type's starting floor is too low. Until it supports a change, floors stay where the operator set them (invariant 44).
+
+Invariant 48.
+
 ---
 
 ## §5 — Struggle detection
@@ -1820,6 +1877,8 @@ Set by hand unless noted. Verify on both boxes. **This is the canonical invarian
 45. (R-45) **Local resource guards** — before loading or routing to a capacity-tier local model, the selector checks free GPU memory, free RAM, loaded models, and the context needed. Without operator authorization it never enables swap, unloads or deletes a working model, downloads a model, or changes an installed model's quantization (§31.5).
 46. (R-46) **Admission before routing** — a model enters any routing path only after it has loaded, answered with content under a class-sized probe budget, and had its resource use and latency recorded in this box's capability profile. Unverified models are deferred with a reason (§31.6).
 47. (R-47) **Writer registry** — every component that can write mutable routing state is registered with the fields it writes, a kind, a status, and evidence. Each field has exactly one `owner`; every other writer is `manual-tool`, `integrated`, `advisory`, or a quarantined or retired `legacy` writer. An `unknown` writer blocks implementation (§3.7a).
+48. (R-48) **Escalation raises a floor, never a provider** — quality-gated escalation raises one task's capability floor by one tier, at most `{{escalation_max_steps}}` times; the switcher's normal logic chooses the lane that meets it, so free-tier exhaustion is handled as for any session. Escalated runs that land on paid draw from a per-work-type daily envelope; when it is spent, the output is delivered marked unverified rather than retried (§4.19).
+49. (R-49) **Memory is context, not evidence or instruction** — recalled memory never sets the task, and recalled current-state facts are REPORTED until re-observed; memories are stored with date, source, observing box and claim label (§0.7).
 
 ---
 
@@ -2192,6 +2251,9 @@ The failure table is no longer duplicated here. It is the trap-door entries in *
 | Writer of unknown kind found | Classify before any implementation | §3.7a, invariant 47 |
 | Alert configured but deliveries fail | FAIL, not acknowledgeable; no automated writes until verified | §0.6, invariant 34 |
 | Write-test needed, live changes forbidden | Scratch home after a passing pre-flight | §10.36 |
+| Output fails its evidence check | Raise that task's floor one tier; switcher picks the lane; envelope bounds paid use | §4.19, invariant 48 |
+| Free allowance spent during an escalation | Switcher's normal fallback; escalation logic unchanged | §4.19 |
+| Recalled memory suggests a task | Ignore; the task is what the operator wrote | §0.7, invariant 49 |
 
 ---
 
@@ -2317,6 +2379,8 @@ This is a **priority order**, not a restatement of rules. Each item names the ru
 36. **Start the observation and decision ledgers** before tuning anything; confirm they hold no conversation content. Invariants 43, 44; §30.
 37. **If the box has local models, write its capability profile** and admit each routed model on this box. Invariants 45, 46; §31.
 38. **Register every writer** of routing state and classify it; quarantine before retiring. Invariant 47; §3.7a.
+39. **Set capability floors per work type and an escalation envelope** before enabling quality-gated escalation. Invariant 48; §4.19.
+40. **Audit agent memory** for stale current-state facts; adopt provenance on new memories. Invariant 49; §0.7.
 
 ---
 
@@ -2413,6 +2477,9 @@ Most of this list is generated from invariants. The rest names a failure mode no
 - Do not retire a writer in one step; register, quarantine, observe, then retire (47).
 - Do not acknowledge a configured-but-failing alert path as if it were absent (34).
 - Do not run a write-test without a passing scratch pre-flight (§10.36).
+- Do not let escalation choose a provider; it raises a capability floor and the switcher picks the lane (48).
+- Do not retry an escalated task past its step limit or spend envelope; deliver it marked unverified (48).
+- Do not take a task from recalled memory, or use remembered current state without re-observing it (49).
 
 ---
 
@@ -2733,6 +2800,8 @@ The list below names the **patterns** the rules exist to prevent. The incident h
 | **Capacity tier** | Larger local models, often partly offloaded to RAM; slower; used only on an escalation trigger (§31.1, §31.3). |
 | **Admission** | Verifying on this box that a model loads, answers, and has its resource use recorded, before it is routed (§31.6). |
 | **Capability profile** | A box's record of its hardware and admitted local models (§31.7). |
+| **Capability floor** | The minimum model tier a work type, or one escalated task, may use. The switcher picks the cheapest eligible lane at or above it (§4.19). |
+| **Escalation envelope** | A per-work-type daily budget for escalated runs that land on a paid model (§4.19). |
 | **Writer registry** | The per-box list of every component that can write routing state, with its kind and status (§3.7a). |
 | **Scratch home** | An isolated copy of the Hermes home for write-tests, verified by pre-flight (§10.36). |
 | **Reason code** | A fixed, enumerated code explaining a decision; never free text (§30.2). |
@@ -3236,6 +3305,7 @@ Each decision is recorded with its reason.
 | v3.5 | v3.4.2 | Local capability tiers and resource guards (§31); invariants 45 (resource guards) and 46 (admission before routing); per-box capability profile. |
 | v3.6 | v3.5 | Principles restated; writer registry and phased retirement (invariant 47); three-state alert gate; per-box vs. fleet table; scratch-home mode; two new checks. |
 | v3.6.1 | v3.6 | Recurring switcher status report (`docs/switcher-status-report.md`). |
+| v3.7 | v3.6.1 | Capability floors and quality-gated escalation (§4.19, invariant 48); agent memory rules (§0.7, invariant 49). |
 
 ### Record 5 — Anomalies and open items
 
@@ -3366,7 +3436,7 @@ A `doctor` command that outputs the deployment's actual config, chains, owners, 
 
 ## §21 — Document version
 
-**Version:** 3.6.1
+**Version:** 3.7
 **Last updated:** 2026-10-15
 
 **Companion artifacts:**
@@ -3452,7 +3522,7 @@ If a deployment keeps these, the rule set stays honest. If it drops them, it pro
 
 ---
 
-**End of the guide, v3.6.1.**
+**End of the guide, v3.7.**
 
 ---
 
@@ -3547,6 +3617,12 @@ numbers:
   ledger_raw_retention_days:
     description: "days raw observation and decision ledgers are kept before rotation; rollups are kept indefinitely"
     question: "default 90"
+  escalation_max_steps:
+    description: "maximum one-tier escalations per task (§4.19)"
+    question: "default 2"
+  escalation_daily_budget:
+    description: "per-work-type daily spend allowed for escalated runs that land on a paid model (§4.19)"
+    question: "e.g. a few cents per work type; when spent, escalated output is delivered marked unverified"
   manual_override_hours:
     description: "how long a manual change pauses the selector before it re-plans"
     question: "default 4; 4–6 recommended. A hold (no expiry) is requested explicitly, not configured here"
@@ -3566,6 +3642,8 @@ numbers:
     description: "minimum uptime before a newly admitted peer serves batch work"
 
 lists:
+  capability_floors:
+    description: "starting minimum tier per work type, e.g. audit/status_report/migration_plan: mid; title/approval: small (§4.19)"
   router_exclusion_patterns:
     description: "id patterns for routers and guardrail models excluded from interactive ladders (§4.4a)"
   selector_tools:

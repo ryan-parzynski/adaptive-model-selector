@@ -84,6 +84,12 @@ numbers:
   ledger_raw_retention_days:
     description: "days raw observation and decision ledgers are kept before rotation; rollups are kept indefinitely"
     question: "default 90"
+  escalation_max_steps:
+    description: "maximum one-tier escalations per task (§4.19)"
+    question: "default 2"
+  escalation_daily_budget:
+    description: "per-work-type daily spend allowed for escalated runs that land on a paid model (§4.19)"
+    question: "e.g. a few cents per work type; when spent, escalated output is delivered marked unverified"
   manual_override_hours:
     description: "how long a manual change pauses the selector before it re-plans"
     question: "default 4; 4–6 recommended. A hold (no expiry) is requested explicitly, not configured here"
@@ -103,6 +109,8 @@ numbers:
     description: "minimum uptime before a newly admitted peer serves batch work"
 
 lists:
+  capability_floors:
+    description: "starting minimum tier per work type, e.g. audit/status_report/migration_plan: mid; title/approval: small (§4.19)"
   router_exclusion_patterns:
     description: "id patterns for routers and guardrail models excluded from interactive ladders (§4.4a)"
   selector_tools:

@@ -8,6 +8,15 @@ Version history of `HERMES-MODEL-SWITCHER.md`. The current version is in `VERSIO
 
 ---
 
+## v3.7 — 2026-10-15 — capability floors, quality-gated escalation, agent memory
+
+- §4.19: escalation raises a task's **capability floor**, never a provider. The switcher's normal logic picks the lane (free while available and above the reserve, then paid-cheapest), so a spent free allowance is handled like any other session. Escalation is bounded by a step limit and a per-work-type daily paid envelope; when the envelope is spent, output is delivered marked "unverified" instead of retried. The trigger is an evidence check on the output (placeholder hashes, VERIFIED without a command, summary/body contradictions, key fragments, unchecked "offline" claims), not the model's opinion of itself. Invariant 48.
+- §0.7: agent memory. Recalled memory is context, never a task; current-state memories are REPORTED until re-observed; memories carry provenance. Invariant 49.
+
+**Adopters: action required**
+- Before enabling escalation: set `capability_floors`, `escalation_max_steps` and `escalation_daily_budget` (questionnaire P9). Make sure no escalation logic names a provider or forces paid; it must only raise the floor.
+- If your agents keep memory: audit current-state memories (addresses, loaded models, limits, chain order) and adopt provenance on new ones (§0.7).
+
 ## v3.6.1 — 2026-10-15 — recurring status report
 
 - `docs/switcher-status-report.md`: a read-only "switcher in action" report for any box running a switcher, adopted or not. It puts the provider's limits next to the switcher's beliefs (flagging impossible readings like used > limit and reset instants that never advance), reconciles spend sources, breaks costs down by model and task type including reasoning-token share, shows each local lane from this box's view (online, on GPU, address vs. node id, last call, latency), and ends with a sanitized JSON summary for comparing boxes.
