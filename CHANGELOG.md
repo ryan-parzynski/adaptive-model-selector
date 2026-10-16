@@ -8,6 +8,14 @@ Version history of `HERMES-MODEL-SWITCHER.md`. The current version is in `VERSIO
 
 ---
 
+## v3.14.1 — 2026-10-15 — contribution fixes from the first real submission
+
+- `checks/contrib-validate.py` accepts the box outbox path (`contrib-outbox/reports/...`); it previously accepted only `contrib/...`, which pushed boxes to stage files elsewhere. It rejects a file named after the `contributor_id`: file names are fresh random hex per file.
+- `contrib/NAMING.md`: GPU memory band is the card's actual memory (12 GB and 16 GB cards are `8-16GB`).
+
+**Adopters: action required**
+- Rename any outbox file named after your `contributor_id`, and recheck lane GPU bands.
+
 ## v3.14 — 2026-10-15 — adaptive check cadence, damped switching, live limit changes
 
 - §4.24: the check interval follows headroom (30 minutes when ample; 5 minutes when under 25% remaining or projected to run out at the current burn rate; immediately on 429s, errors, override ends and limit changes). Optional switches need a sustained gain above `switch_gain_pct` over two checks. A mid-day limit change (for example, credits bought) is recorded, and the reserve and thresholds are recomputed from the new limit. Invariant 57.

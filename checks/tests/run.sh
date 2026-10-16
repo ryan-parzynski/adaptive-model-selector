@@ -194,6 +194,11 @@ expect 0 "contrib: deny list, clean file" -- python3 "$C/contrib-validate.py" --
 expect 2 "contrib: deny file missing" -- python3 "$C/contrib-validate.py" --deny-file "$T/nope.txt" "$CV/findings/edge-cases/2026-10/0f0e0d0c.yaml"
 sed 's/id: lane-a/id: gpubox1/' "$C/../docs/examples/contrib-report.example.yaml" > "$CV/reports/2026-10/9a9a9a9a.yaml"
 expect 1 "contrib: lane named, not lettered" -- python3 "$C/contrib-validate.py" "$CV/reports/2026-10/9a9a9a9a.yaml"
+mkdir -p "$T/state/contrib-outbox/reports/2026-10"
+cp "$C/../docs/examples/contrib-report.example.yaml" "$T/state/contrib-outbox/reports/2026-10/5e5e5e5e.yaml"
+expect 0 "contrib: outbox path accepted" -- python3 "$C/contrib-validate.py" "$T/state/contrib-outbox/reports/2026-10/5e5e5e5e.yaml"
+cp "$C/../docs/examples/contrib-report.example.yaml" "$CV/reports/2026-10/3f9a1c07.yaml"
+expect 1 "contrib: file named after contributor_id" -- python3 "$C/contrib-validate.py" "$CV/reports/2026-10/3f9a1c07.yaml"
 expect 2 "contrib: no arguments" -- python3 "$C/contrib-validate.py"
 
 echo; echo "$PASS passed, $FAILS failed"

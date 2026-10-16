@@ -85,7 +85,7 @@ Read it or don't; the rules stand alone.
 
 ## Status
 
-- **Version:** 3.14 (see `VERSION`; history and adopter actions in `CHANGELOG.md`)
+- **Version:** 3.14.1 (see `VERSION`; history and adopter actions in `CHANGELOG.md`)
 - **Verified:** source-verified against the running stack. The checks in
   `checks/` are tested against fixtures (`checks/tests/run.sh`) but not yet on a
   live Hermes box. Code blocks remaining inside the specification are

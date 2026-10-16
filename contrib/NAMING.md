@@ -14,11 +14,12 @@ Everything under `contrib/` is public. It describes **what kind of setup** produ
 
 | Thing | Descriptor | Example |
 |---|---|---|
+| A contribution file | its name: **fresh** 8 random hex per file, never the `contributor_id` | `9c41e0b2.yaml` |
 | The contributing box | `contributor_id`: 8 random hex, generated **once at install** and stored in `state/switcher-adoption.yaml`. Never derived from a hostname or key. | `3f9a1c07` |
 | The box's role | `consumer`, `gpu_host`, `consumer_and_gpu_host` | `consumer` |
 | A lane | `lane-a`, `lane-b`, …, assigned in a fixed order per box and kept stable across that box's reports | `lane-b` |
 | What the lane is | `role`: `local_gpu`, `local_cpu`, `peer_gpu`, `peer_cpu`, `relayed_peer_gpu`, `api` | `relayed_peer_gpu` |
-| Its hardware | `gpu`: vendor + memory band (`nvidia-8-16GB`, `intel-8-16GB`, `none`) | `intel-8-16GB` |
+| Its hardware | `gpu`: vendor + memory band (`nvidia-8-16GB`, `intel-8-16GB`, `none`). Use the card's **actual** memory: a 12 GB card is `8-16GB`, a 16 GB card is `8-16GB`, an 8 GB card is `<=8GB`. | `intel-8-16GB` |
 | How it's hosted | `virtualization`: `bare_metal`, `vm`, `container` | `container` |
 | How it's reached | `path`: `same_box`, `same_host`, `lan`, `remote_direct`, `remote_relayed` | `remote_relayed` |
 | Box size | bands: `cpu_cores` `17-32`, `ram_gb` `65-128`, `gpu_class` `8-16GB` | |

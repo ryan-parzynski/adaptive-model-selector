@@ -180,9 +180,9 @@ def main(argv):
     bad = 0
     for p in paths:
         global errs; errs = []
-        m = re.search(r"contrib/(reports|findings/[a-z-]+)/(20\d\d-\d\d)/[0-9a-f]{8}\.yaml$", p.replace(os.sep, "/"))
+        m = re.search(r"contrib(?:-outbox)?/(reports|findings/[a-z-]+)/(20\d\d-\d\d)/[0-9a-f]{8}\.yaml$", p.replace(os.sep, "/"))
         if not m:
-            errs.append("path must be contrib/reports/YYYY-MM/<8 hex>.yaml or contrib/findings/<kind dir>/YYYY-MM/<8 hex>.yaml")
+            errs.append("path must be contrib/ (or the box outbox contrib-outbox/) + reports/YYYY-MM/<8 hex>.yaml or findings/<kind dir>/YYYY-MM/<8 hex>.yaml")
         try:
             raw = open(p, "rb").read()
         except OSError:
@@ -215,6 +215,9 @@ def main(argv):
                 for k in REQUIRED[schema]:
                     if k not in doc: errs.append(f"missing required field {k}")
                 check(spec, doc, "")
+                fname = os.path.basename(p)[:-5]
+                if isinstance(doc.get("contributor_id"), str) and fname == doc["contributor_id"]:
+                    errs.append("file name must be fresh random hex per file, not the contributor_id (names would collide and repeat)")
                 if m and doc.get("month") and doc.get("month") != m.group(2):
                     errs.append("month field must match the folder")
         for e in errs: print(f"INVALID {p}: {e.lstrip('.')}")
