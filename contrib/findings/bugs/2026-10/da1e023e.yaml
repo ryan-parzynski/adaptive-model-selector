@@ -1,0 +1,37 @@
+schema: finding/v1
+contributor_id: "chris-hermes-2026"
+spec_version: "3.15"
+month: "2026-10"
+kind: bugs
+sections: ["§30", "§10.12", "invariant 34"]
+environment:
+  runtime_version: "hermes-bash"
+  providers: [deepseek, openrouter]
+  alerting: self_hosted_ntfy
+observed: >-
+  The delivery ledger (deliveries.db) records zero rows for successful alert deliveries. A real
+  alert was delivered end-to-end (verified by reading the message from the ntfy server's own store
+  at 03:18:05Z), but no row appeared in deliveries.db. The ledger has been frozen at 14 rows since
+  2026-10-12, all marked failed, despite the fact that deliveries are demonstrably succeeding.
+how_to_reproduce: >-
+  Configure an alert destination (e.g., self-hosted ntfy). Trigger a real alert manually (via cron
+  or a direct call). Observe: message is received and stored on the destination. Query deliveries.db:
+  zero rows with today's date. Verify the delivery outside the database: message is present. The
+  ledger wrote nothing.
+why_it_matters: >-
+  Invariant 34 requires "loud" failures — alerts must be verified. The spec rule "assert delivered
+  row within N minutes of event" cannot be checked if the ledger never writes. A box can run silent
+  with no one knowing the alert path is broken.
+evidence: >-
+  Chris's box: deepseek-credit-watchdog job ran at 03:15:56Z. Message was read back from ntfy server
+  at 03:18:05Z (verified by token auth and topic query). Query: SELECT COUNT(*) FROM deliveries WHERE
+  datetime(timestamp) = '2026-10-17'; result: 0 rows. Ledger query for all dates: 14 rows, all dated
+  2026-10-12 or earlier, all marked failed.
+scope: likely_everyone
+frequency: always
+proposal: >-
+  The spec must require that a delivery write is asserted after a successful delivery. If the ledger
+  cannot be written (permissions, database lock, etc.), the delivery system must log an error loudly
+  and alert the operator. Do not treat "no row written" as normal.
+reason_codes: [ledger_defect, silent_failure]
+boxes_observed: 1
