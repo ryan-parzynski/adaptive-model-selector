@@ -1,36 +1,42 @@
 schema: finding/v1
-contributor_id: "e5xeon-2026"
-spec_version: "3.15"
-month: "2026-10"
+contributor_id: e5xeon-2026
+spec_version: '3.15'
+month: 2026-10
 kind: bugs
-sections: ["§4.9", "§10.26"]
+sections:
+- §4.9
+- §10.26
 environment:
-  runtime_version: "hermes-custom"
-  providers: [openrouter, deepseek]
-  lane_types: [api_free, api_paid]
-  gpu_class: "16GB"
-observed: >-
-  Model selector chooses free-tier models that respond with HTTP 429 (rate limited) without detecting
-  the error. Session times out waiting for a response that never comes. Selector does not fall back to
-  paid or next tier; task fails as if the model is dead, when the problem is upstream rate limiting.
-how_to_reproduce: >-
-  Route a task to a free-tier model known to have tight rate limits (e.g., models with <10 req/min).
-  Send multiple requests in rapid succession. Observe: selector picks the free model, gets 429 from
-  the provider, times out, reports failure. Check selector logs: no mention of 429 or rate limit.
-why_it_matters: >-
-  Free tiers are most useful when they have headroom. A selector that doesn't detect 429 wastes
-  budget escalating to paid lanes when the free tier is merely saturated, not dead. Every escalation
-  is unnecessary cost and slower response.
-evidence: >-
-  E5 box: model selector logs show repeated timeouts on openrouter free models. Concurrent requests
-  to the same model from other sources confirm provider returned 429 to selector but selector's own
-  logs do not record the HTTP error code. Provider rate limit window is 60 requests per minute;
-  selector made 5 requests in 45 seconds on one free model.
+  runtime_version: hermes-custom
+  providers:
+  - openrouter
+  - deepseek
+  lane_types:
+  - api_free
+  - api_paid
+  gpu_class: 16GB
+observed: Model selector chooses free-tier models that respond with HTTP 429 (rate
+  limited) without detecting the error. Session times out waiting for a response that
+  never comes. Selector does not fall back to paid or next tier; task fails as if
+  the model is dead, when the problem is upstream rate limiting.
+how_to_reproduce: 'Route a task to a free-tier model known to have tight rate limits
+  (e.g., models with <10 req/min). Send multiple requests in rapid succession. Observe:
+  selector picks the free model, gets 429 from the provider, times out, reports failure.
+  Check selector logs: no mention of 429 or rate limit.'
+why_it_matters: Free tiers are most useful when they have headroom. A selector that
+  doesn't detect 429 wastes budget escalating to paid lanes when the free tier is
+  merely saturated, not dead. Every escalation is unnecessary cost and slower response.
+evidence: '<hermes-box-1>: model selector logs show repeated timeouts on openrouter
+  free models. Concurrent requests to the same model from other sources confirm provider
+  returned 429 to selector but selector''s own logs do not record the HTTP error code.
+  Provider rate limit window is 60 requests per minute; selector made 5 requests in
+  45 seconds on one free model.'
 scope: likely_everyone
 frequency: often
-proposal: >-
-  Selector must detect HTTP 429 responses and treat them as transient provider-side rate limiting,
-  not model failure. On 429: sleep briefly (jitter 0.5–2s), retry up to N times on the same model,
-  then fall back to next tier (paid if available, or local if no paid tier).
-reason_codes: [rate_limit_undetected]
+proposal: 'Selector must detect HTTP 429 responses and treat them as transient provider-side
+  rate limiting, not model failure. On 429: sleep briefly (jitter 0.5–2s), retry up
+  to N times on the same model, then fall back to next tier (paid if available, or
+  local if no paid tier).'
+reason_codes:
+- rate_limit_undetected
 boxes_observed: 1

@@ -1,44 +1,51 @@
 schema: finding/v1
-contributor_id: "e5xeon-2026"
-spec_version: "3.15"
-month: "2026-10"
+contributor_id: e5xeon-2026
+spec_version: '3.15'
+month: 2026-10
 kind: unclear_rules
-sections: ["§31", "§30", "invariant 44"]
+sections:
+- §31
+- §30
+- invariant 44
 environment:
-  runtime_version: "hermes-custom"
-  providers: [openrouter, deepseek]
+  runtime_version: hermes-custom
+  providers:
+  - openrouter
+  - deepseek
   gpu_lanes: 3
-  gpu_class: "8-16GB"
+  gpu_class: 8-16GB
   co_resident_models: true
-observed: >-
-  On VRAM-constrained lanes, multiple models compete for GPU memory. A model believed to be resident
-  (warm) takes as long to answer as a cold start, suggesting it was evicted since the previous call.
-  No data is currently recorded about whether a model was resident before a call, so the selector
-  cannot distinguish "model was resident and answered slowly" from "model was evicted and had to reload."
-  One timeout event was logged on a VRAM-constrained lane; analysis recommended no action without more
-  history. The runtime's own OOM eviction (logged when VRAM runs out) proves eviction is happening, but
-  it is not correlated with call latency or recorded in the decision ledger.
-how_to_reproduce: >-
-  On a box with multiple models per lane and less than 2x total model memory available: alternate calls
-  between two models. Observe latency: sometimes the "warm" call is fast, sometimes it costs a full
-  reload. No current log shows whether the model was resident beforehand.
-why_it_matters: >-
-  Without residency data, the box cannot tune co-residency strategy or decide whether keeping multiple
-  models loaded is effective for its workload. A future rule (adaptive unload, or co-residency tuning)
-  cannot be built on guesswork; it needs measured effectiveness over time.
-evidence: >-
-  E5 box: one timeout event logged with analysis recommending "retry_as_is." Chris's box: "warm" call
-  took 24.04s when the model had been evicted by OOM; previous "warm" call on the same model took
-  0.53s. Runtime logs show "evicting all other loaded models for OOM retry," but decision ledger does
-  not record which model was resident before the call.
+observed: On VRAM-constrained lanes, multiple models compete for GPU memory. A model
+  believed to be resident (warm) takes as long to answer as a cold start, suggesting
+  it was evicted since the previous call. No data is currently recorded about whether
+  a model was resident before a call, so the selector cannot distinguish "model was
+  resident and answered slowly" from "model was evicted and had to reload." One timeout
+  event was logged on a VRAM-constrained lane; analysis recommended no action without
+  more history. The runtime's own OOM eviction (logged when VRAM runs out) proves
+  eviction is happening, but it is not correlated with call latency or recorded in
+  the decision ledger.
+how_to_reproduce: 'On a box with multiple models per lane and less than 2x total model
+  memory available: alternate calls between two models. Observe latency: sometimes
+  the "warm" call is fast, sometimes it costs a full reload. No current log shows
+  whether the model was resident beforehand.'
+why_it_matters: Without residency data, the box cannot tune co-residency strategy
+  or decide whether keeping multiple models loaded is effective for its workload.
+  A future rule (adaptive unload, or co-residency tuning) cannot be built on guesswork;
+  it needs measured effectiveness over time.
+evidence: '<hermes-box-1>: one timeout event logged with analysis recommending "retry_as_is."
+  <hermes-box-2>: "warm" call took 24.04s when the model had been evicted by OOM;
+  previous "warm" call on the same model took 0.53s. Runtime logs show "evicting all
+  other loaded models for OOM retry," but decision ledger does not record which model
+  was resident before the call.'
 scope: setups_like_mine
 frequency: always
-proposal: >-
-  Record per-call in the observation ledger: (1) was the model resident before the call (yes/no, from
-  runtime's loaded-models list)? (2) how long did the load + first-token take? (3) if different from
-  the baseline cold-load time, mark with reason code (e.g., evicted_before_call). After one allowance
-  cycle, track: for each model on each lane, what % of calls found the model resident? Use this to
-  guide future tuning: if resident >=80%, co-residency is effective; if <20%, unload after timeout.
-  This is measurement-first per invariant 44: no tuning until there is history.
-reason_codes: [residency_unobserved]
+proposal: 'Record per-call in the observation ledger: (1) was the model resident before
+  the call (yes/no, from runtime''s loaded-models list)? (2) how long did the load
+  + first-token take? (3) if different from the baseline cold-load time, mark with
+  reason code (e.g., evicted_before_call). After one allowance cycle, track: for each
+  model on each lane, what % of calls found the model resident? Use this to guide
+  future tuning: if resident >=80%, co-residency is effective; if <20%, unload after
+  timeout. This is measurement-first per invariant 44: no tuning until there is history.'
+reason_codes:
+- residency_unobserved
 boxes_observed: 2

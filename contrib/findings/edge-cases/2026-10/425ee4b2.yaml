@@ -1,36 +1,39 @@
 schema: finding/v1
-contributor_id: "chris-hermes-2026"
-spec_version: "3.15"
-month: "2026-10"
+contributor_id: <hermes-box-2>-hermes-2026
+spec_version: '3.15'
+month: 2026-10
 kind: edge_cases
-sections: ["§26.8", "§10.12"]
+sections:
+- §26.8
+- §10.12
 environment:
-  runtime_version: "hermes-bash"
-  providers: [deepseek, openrouter]
+  runtime_version: hermes-bash
+  providers:
+  - deepseek
+  - openrouter
   alerting: self_hosted_ntfy
-  ntfy_version: "2.31.1"
-observed: >-
-  Archived ntfy setup script (ntfy-setup.sh) passes the --config flag after the subcommand
-  (e.g., ntfy user add --config /path). This worked on ntfy v2.2.x but ntfy v2.31.1 only accepts
-  --config as a global flag before the subcommand. Result: user and token subcommands reject the
-  flag and silently skip, token file captures banner text instead of the token, no error is raised.
-how_to_reproduce: >-
-  Download ntfy v2.31.1. Run the archived setup script with --config after the subcommand. The
-  script appears to succeed (exit 0) but token file is empty or contains help text. Manual test:
-  ntfy --config /path user add ... works; ntfy user add --config /path fails silently on v2.31.1.
-why_it_matters: >-
-  A box upgrading ntfy and re-running the setup script will silently fail to create credentials.
-  The platform will not be configured, and alerts will be lost. No error is raised; the box thinks
-  it is alerting when it is not.
-evidence: >-
-  Chris's box: ntfy-setup.sh output showed success, but grep -r 'tk_' hermes.token returned no token.
-  Manual reproduction: ntfy --help shows --config in the GLOBAL OPTIONS section, not in the
-  subcommand options. Version check: ntfy --version = 2.31.1.
+  ntfy_version: 2.31.1
+observed: 'Archived ntfy setup script (ntfy-setup.sh) passes the --config flag after
+  the subcommand (e.g., ntfy user add --config /path). This worked on ntfy v2.2.x
+  but ntfy v2.31.1 only accepts --config as a global flag before the subcommand. Result:
+  user and token subcommands reject the flag and silently skip, token file captures
+  banner text instead of the token, no error is raised.'
+how_to_reproduce: 'Download ntfy v2.31.1. Run the archived setup script with --config
+  after the subcommand. The script appears to succeed (exit 0) but token file is empty
+  or contains help text. Manual test: ntfy --config /path user add ... works; ntfy
+  user add --config /path fails silently on v2.31.1.'
+why_it_matters: A box upgrading ntfy and re-running the setup script will silently
+  fail to create credentials. The platform will not be configured, and alerts will
+  be lost. No error is raised; the box thinks it is alerting when it is not.
+evidence: '<hermes-box-2>: ntfy-setup.sh output showed success, but grep -r ''tk_''
+  hermes.token returned no token. Manual reproduction: ntfy --help shows --config
+  in the GLOBAL OPTIONS section, not in the subcommand options. Version check: ntfy
+  --version = 2.31.1.'
 scope: setups_like_mine
 frequency: sometimes
-proposal: >-
-  Setup scripts for ntfy v2.31.1+ must pass --config as a global flag before the subcommand.
-  For user and token subcommands specifically, the config path can also be read from the
-  NTFY_CONFIG_FILE environment variable instead of the flag.
-reason_codes: [version_drift]
+proposal: Setup scripts for ntfy v2.31.1+ must pass --config as a global flag before
+  the subcommand. For user and token subcommands specifically, the config path can
+  also be read from the NTFY_CONFIG_FILE environment variable instead of the flag.
+reason_codes:
+- version_drift
 boxes_observed: 1
